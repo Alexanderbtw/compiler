@@ -1,6 +1,6 @@
 using System;
 
-namespace Compiler.Frontend.Interpretation.Contracts;
+namespace Compiler.Frontend.Interpretation.Signals;
 
 internal sealed class ContinueSignal : Exception
 {

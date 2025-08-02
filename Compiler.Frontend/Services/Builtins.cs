@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 using Compiler.Frontend.Interpretation.Exceptions;
 
-namespace Compiler.Frontend.Interpretation.Contracts;
+namespace Compiler.Frontend.Services;
 
 public static class Builtins
 {

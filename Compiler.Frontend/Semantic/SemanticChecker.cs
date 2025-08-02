@@ -5,7 +5,9 @@ using System.Linq;
 using Compiler.Frontend.AST;
 using Compiler.Frontend.AST.Expressions;
 using Compiler.Frontend.AST.Statements;
-using Compiler.Frontend.Interpretation.Contracts;
+using Compiler.Frontend.Semantic.Exceptions;
+using Compiler.Frontend.Semantic.Symbols;
+using Compiler.Frontend.Services;
 
 namespace Compiler.Frontend.Semantic;
 
