@@ -8,5 +8,5 @@ fn main() {
     var start = clock_ms();
     var r = fact(n);
     var end  = clock_ms();
-    print("20! = ", r, " ⏱ ", end - start, " ms");
+    print("20! = ", r, " execution time: ", end - start, " ms");
 }

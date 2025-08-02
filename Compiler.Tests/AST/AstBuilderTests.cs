@@ -6,16 +6,10 @@ using Xunit.Abstractions;
 
 namespace Compiler.Tests.AST;
 
-// MiniLang.Tests/AstBuilderTests.cs
-// AST record types
-
 public class AstBuilderTests
 {
     private readonly ITestOutputHelper _testOutputHelper;
     public AstBuilderTests(ITestOutputHelper testOutputHelper) => _testOutputHelper = testOutputHelper;
-    /* ───────────────────────────────────────────────
-       5.  CHAR literal survives the builder
-    ─────────────────────────────────────────────── */
     [Fact]
     public void CharLiteralNodePresent()
     {
@@ -26,9 +20,7 @@ public class AstBuilderTests
         Assert.NotNull(charNode);
         Assert.Equal('A', charNode!.Value);
     }
-    /* ───────────────────────────────────────────────
-       1.  Minimal program parses
-    ─────────────────────────────────────────────── */
+
     [Fact]
     public void EmptyProgram()
     {
@@ -37,9 +29,6 @@ public class AstBuilderTests
         Assert.Equal("main", ast.Functions[0].Name);
     }
 
-    /* ───────────────────────────────────────────────
-       2.  Recursive factorial (calls, if/return, <=, *, -)
-    ─────────────────────────────────────────────── */
     [Fact]
     public void FactorialAst_OK()
     {
@@ -75,7 +64,6 @@ public class AstBuilderTests
         _ => [e]
     };
 
-    /*──────────────── helper pair ────────────────*/
     private static IEnumerable<Expr> FlattenStmts(Stmt s) => s switch
     {
         Block b => b.Body.SelectMany(FlattenStmts),
@@ -103,9 +91,6 @@ public class AstBuilderTests
         _ => []
     };
 
-    /* ───────────────────────────────────────────────
-       3.  For-loop with init & iterator expression lists
-    ─────────────────────────────────────────────── */
     [Fact]
     public void ForLoop_ExpressionLists()
     {
@@ -125,9 +110,6 @@ public class AstBuilderTests
         Assert.Equal(2, loop.Iter!.Count);
     }
 
-    /* ───────────────────────────────────────────────
-       4.  Array indexing + call arguments
-    ─────────────────────────────────────────────── */
     [Fact]
     public void IndexAndCall()
     {
