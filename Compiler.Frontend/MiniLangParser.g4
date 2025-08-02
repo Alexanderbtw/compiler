@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────────
-// MiniLangParser.g4   –   syntax for the factorial / sort / sieve benchmark Lang
+// MiniLangParser.g4  –  minimal syntax for the factorial / sort / sieve language
 // ────────────────────────────────────────────────────────────────────────────────
 parser grammar MiniLangParser;
 
@@ -30,34 +30,33 @@ statement
     | continueStmt
     | returnStmt
     | exprStmt
-    | block                     // nested block
+    | block
     ;
 
-// variable declaration - e.g.  let i = 0;
-variableDecl     : LET ID (ASSIGN expression)? SEMI ;
+// variable declaration – e.g.  var i = 0;
+variableDecl     : VAR ID (ASSIGN expression)? SEMI ;
 
 // control-flow
 ifStmt           : IF LPAREN expression RPAREN statement (ELSE statement)? ;
 whileStmt        : WHILE LPAREN expression RPAREN statement ;
 forStmt          : FOR LPAREN
-                       (variableDecl | exprList? SEMI)
-                       expression?  SEMI
-                       expressionList?
-                   RPAREN statement ;
+                      (variableDecl | expressionList? SEMI)   // init
+                      expression? SEMI                        // condition
+                      expressionList?                         // iterator
+                  RPAREN statement ;
 
 breakStmt        : BREAK    SEMI ;
 continueStmt     : CONTINUE SEMI ;
 returnStmt       : RETURN   expression? SEMI ;
 
-// plain expression or an empty “;”
+// plain expression or an empty ‘;’
 exprStmt         : expression? SEMI ;
 
 // helpers
-exprList         : expression (COMMA expression)* ;
 expressionList   : expression (COMMA expression)* ;
 
 // ────────────────
-// 4.  Expressions  (Pratt / precedence-climbing style)
+// 4.  Expressions (operator precedence)
 // ────────────────
 expression       : assignment ;
 
@@ -70,34 +69,36 @@ assignment
 logicalOr        : logicalAnd (OR_OR logicalAnd)* ;
 logicalAnd       : equality   (AND_AND equality)* ;
 
-// ==  !=
+// == !=
 equality         : comparison ((EQ | NEQ) comparison)* ;
 
-// <  <=  >  >=
+// < <= > >=
 comparison       : addition   ((LT | LE | GT | GE) addition)* ;
 
-// +  -
+// + -
 addition         : multiplication ((PLUS | MINUS) multiplication)* ;
 
-// *  /  %
+// * / %
 multiplication   : unary ((STAR | SLASH | PERCENT) unary)* ;
 
-// unary +  -  !
+// unary + - !
 unary            : (PLUS | MINUS | BANG) unary
                  | postfixExpr ;
 
-// postfix: calls and indexing – left-recursive made safe by ANTLR precedence
-postfixExpr  : primary ( callSuffix | indexSuffix )* ;
-
-callSuffix   : LPAREN argumentList? RPAREN   ;  // #callSuffix (top-level)
-indexSuffix  : LBRACK expression RBRACK      ;  // #indexSuffix
+// postfix: calls and indexing
+postfixExpr      : primary (callSuffix | indexSuffix)* ;
+callSuffix       : LPAREN argumentList? RPAREN ;
+indexSuffix      : LBRACK expression RBRACK ;
 
 argumentList     : expression (COMMA expression)* ;
 
-// atoms
+// ────────────────
+// 5.  Primary atoms
+// ────────────────
 primary
     : INT                         #intLiteral
     | STRING                      #stringLiteral
+    | CHAR                        #charLiteral
     | TRUE                        #boolTrue
     | FALSE                       #boolFalse
     | ID                          #identifier

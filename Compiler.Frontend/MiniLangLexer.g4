@@ -21,7 +21,7 @@ WS           : [ \t\r\n]+       -> skip;               // any whitespace
 // ────────────────
 FN       : 'fn';
 RETURN   : 'return';
-LET      : 'let';
+VAR      : 'var';
 IF       : 'if';
 ELSE     : 'else';
 WHILE    : 'while';

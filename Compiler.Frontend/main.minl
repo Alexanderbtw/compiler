@@ -4,9 +4,9 @@ fn fact(n) {
 }
 
 fn main() {
-    let n = 20;
-    let start = clock_ms();
-    let r = fact(n);
-    let end  = clock_ms();
+    var n = 20;
+    var start = clock_ms();
+    var r = fact(n);
+    var end  = clock_ms();
     print("20! = ", r, " ⏱ ", end - start, " ms");
 }
