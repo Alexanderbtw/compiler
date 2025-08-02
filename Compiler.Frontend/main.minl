@@ -1,0 +1,12 @@
+fn fact(n) {
+    if (n <= 1) return 1;
+    return n * fact(n - 1);
+}
+
+fn main() {
+    let n = 20;
+    let start = clock_ms();
+    let r = fact(n);
+    let end  = clock_ms();
+    print("20! = ", r, " ⏱ ", end - start, " ms");
+}
