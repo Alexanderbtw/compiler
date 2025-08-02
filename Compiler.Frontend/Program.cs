@@ -3,14 +3,22 @@ using System.IO;
 
 using Antlr4.Runtime;
 
+using Compiler.Frontend.AST;
+
 namespace Compiler.Frontend;
 
 public class Program
 {
     private static void Main(string[] args)
     {
-        var program = ReadAllInput("main.minl");
+        string program = ReadAllInput("main.minl");
         Try(program);
+    }
+
+    private static string ReadAllInput(string fn)
+    {
+        string input = File.ReadAllText(fn);
+        return input;
     }
 
     private static void Try(string input)
@@ -25,6 +33,8 @@ public class Program
         lexer.AddErrorListener(listenerLexer);
         parser.AddErrorListener(listenerParser);
         MiniLangParser.ProgramContext tree = parser.program();
+        var builder = new AstBuilder();
+        ProgramAst ast = builder.Build(tree);
         if (listenerLexer.HadError || listenerParser.HadError)
         {
             Console.ForegroundColor = ConsoleColor.Red;
@@ -36,11 +46,5 @@ public class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("parse completed");
         }
-    }
-
-    private static string ReadAllInput(string fn)
-    {
-        string input = File.ReadAllText(fn);
-        return input;
     }
 }

@@ -1,3 +1,3 @@
 namespace Compiler.Frontend.AST.Statements;
 
-abstract public record Stmt;
+public abstract record Stmt;

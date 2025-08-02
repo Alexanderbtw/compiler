@@ -169,22 +169,38 @@ public sealed class AstBuilder : MiniLangParserBaseVisitor<object>
     public override object VisitPostfixExpr(MiniLangParser.PostfixExprContext ctx)
     {
         var expr = (Expr)Visit(ctx.primary());
-        for (var i = 1; i < ctx.children.Count - 1; i++)
+
+        // iterate over *rule* children (tokens are ignored automatically)
+        foreach (IParseTree? child in ctx.children)
         {
-            IParseTree? child = ctx.children[i];
             switch (child)
             {
+                // ── a [...] suffix ───────────────────────────────
+                case MiniLangParser.IndexSuffixContext idx:
+                {
+                    var indexExpr = (Expr)Visit(idx.expression());
+                    expr = new IndexExpr(expr, indexExpr);
+                    break;
+                }
+
+                // ── a (...) suffix ───────────────────────────────
                 case MiniLangParser.CallSuffixContext call:
+                {
                     List<Expr> args = call.argumentList() == null
                         ? new List<Expr>()
-                        : VisitArgumentList(call.argumentList());
+                        : call.argumentList()
+                            .expression()
+                            .Select(e => (Expr)Visit(e))
+                            .ToList();
+
                     expr = new CallExpr(expr, args);
                     break;
-                case MiniLangParser.IndexSuffixContext idx:
-                    expr = new IndexExpr(expr, (Expr)Visit(idx.expression()));
-                    break;
+                }
+
+                // terminals like '[' '(' ')' ']' fall through
             }
         }
+
         return expr;
     }
 
