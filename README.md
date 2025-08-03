@@ -1,7 +1,9 @@
 [Documentation](docs.md)
 
 # TOOD:
-- Translate to CIL and run on CLR
+- Translate AST -> MIR (mini IR)
+- Translate MIR -> CIL and run on CLR
+- Translate MIR -> SSA and run on LLVM
 - Write own backend (?)
 
 ## Goal:
