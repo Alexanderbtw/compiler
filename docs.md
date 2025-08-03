@@ -183,34 +183,3 @@ fn sieve(limit) {
 fn main() { sieve(100); }
 ```
 
----
-
-## 9 · Diagnostic messages
-
-| Phase          | Example message                               |
-|----------------|-----------------------------------------------|
-| Lexing         | `line 3: unterminated string literal`         |
-| Parsing        | `line 7: mismatched input '}' expecting ';'`  |
-| Semantic check | `identifier 'i' not in scope`                 |
-| Runtime        | `array index out of bounds`                   |
-
-Compilation halts on the first error; the interpreter exits with code 1.
-
----
-
-## 10 · Implementation notes (for contributors)
-
-Directory layout:
-
-```
-Frontend/
-  Lexer/           MiniLangLexer.g4
-  Parser/          MiniLangParser.g4
-  AST/             *.cs   // immutable record types
-  Semantics/       SemanticChecker.cs
-  Interpretation/  Interpreter.cs
-Tests/              // xUnit suites: lexer, parser, AST, semantics, interpreter
-```
-
-* Style – run `dotnet format`.  
-* Use `Interpreter.Run(true)` to get execution-time traces.
