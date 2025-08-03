@@ -1,6 +1,32 @@
-namespace Compiler.Tests.Tasks;
+fn sieve(limit) {
+    var flags = array(limit + 1);
 
-public interface prime_number_generation_minl
-{
-    
+    var i = 0;
+    while (i <= limit) { flags[i] = 1;  i = i + 1; }
+    flags[0] = 0;   // 0 and 1 are not prime
+    flags[1] = 0;
+
+    var p = 2;
+    while (p * p <= limit) {
+        if (flags[p] == 1) {
+            var j = p * p;
+            while (j <= limit) { flags[j] = 0;  j = j + p; }
+        }
+        p = p + 1;
+    }
+    return flags;
+}
+
+fn main() {
+    var limit = 100000;
+    var primeFlags = sieve(limit);
+
+    // count primes instead of printing them all
+    var count = 0;
+    var i = 0;
+    while (i <= limit) {
+        if (primeFlags[i] == 1) count = count + 1;
+        i = i + 1;
+    }
+    print(count);        // 9592
 }

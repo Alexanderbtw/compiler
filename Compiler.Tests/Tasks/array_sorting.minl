@@ -1,0 +1,38 @@
+fn qsort(arr, lo, hi) {
+    if (lo >= hi) return;
+
+    var p = arr[(lo + hi) / 2];
+    var i = lo;
+    var j = hi;
+
+    while (i <= j) {
+        while (arr[i] < p)  i = i + 1;
+        while (arr[j] > p)  j = j - 1;
+
+        if (i <= j) {
+            var t   = arr[i];
+            arr[i]  = arr[j];
+            arr[j]  = t;
+            i = i + 1;
+            j = j - 1;
+        }
+    }
+
+    qsort(arr, lo, j);
+    qsort(arr, i,  hi);
+}
+
+fn main() {
+    var N = 10000;
+    var a = array(N);
+
+    // fill the array with reverse-ordered numbers N-1 .. 0
+    var k = 0;
+    while (k < N) { a[k] = (N - 1) - k;  k = k + 1; }
+
+    qsort(a, 0, N - 1);
+
+    // simple correctness check: print first & last element
+    print(a[0]);
+    print(a[N - 1]);
+}

@@ -25,17 +25,8 @@ public class InterpreterTests
                 return s;   // 1+2+4 = 7
             }";
 
-        (object? res, _) = Run(src);
+        (object? res, _) = Utils.Run(src);
         Assert.Equal(7L, res);
-    }
-
-    private static ProgramAst BuildAst(string src)
-    {
-        MiniLangParser parser = Utils.CreateParser(src);
-        var tree = parser.program();
-        ProgramAst ast = new AstBuilder().Build(tree);
-        new SemanticChecker().Check(ast);
-        return ast;
     }
 
     [Fact]
@@ -48,7 +39,7 @@ public class InterpreterTests
                 print(""val="", a[0]);
             }";
 
-        (_, string stdout) = Run(src);
+        (_, string stdout) = Utils.Run(src);
         Assert.Equal("val=7", stdout); // printed correctly
     }
 
@@ -62,7 +53,7 @@ public class InterpreterTests
             }
             fn main() { return fact(20); }";
 
-        (object? value, _) = Run(src);
+        (object? value, _) = Utils.Run(src);
         Assert.Equal(2432902008176640000L, value);
     }
 
@@ -94,23 +85,8 @@ public class InterpreterTests
                 k=0; while(k<10){ print(a[k]); k=k+1; }
             }";
 
-        (_, string stdout) = Run(src);
+        (_, string stdout) = Utils.Run(src);
         Assert.Equal("0\n1\n2\n3\n4\n5\n6\n7\n8\n9", stdout.Replace(" ", ""));
-    }
-
-    private static (object? value, string stdout) Run(string src, bool time = false)
-    {
-        ProgramAst ast = BuildAst(src);
-        var interp = new Interpreter(ast);
-
-        var sb = new StringBuilder();
-        using var writer = new StringWriter(sb);
-        TextWriter old = Console.Out;
-        Console.SetOut(writer);
-        object? ret = interp.Run(time);
-        Console.SetOut(old);
-
-        return (ret, sb.ToString().TrimEnd());
     }
 
     [Fact]
@@ -135,7 +111,7 @@ public class InterpreterTests
                 return cnt;
             }";
 
-        (object? res, _) = Run(src);
+        (object? res, _) = Utils.Run(src);
         Assert.Equal(3245L, res); // reference count of primes ≤ 30000
     }
 
@@ -143,7 +119,7 @@ public class InterpreterTests
     public void IndexExprReturnsValue()
     {
         var src = @"fn main(){ var a=array(1); a[0]=99; print(a[0]); }";
-        var (_, outTxt) = Run(src);
+        var (_, outTxt) = Utils.Run(src);
         Assert.Equal("99", outTxt);
     }
 }

@@ -28,4 +28,16 @@
         <ProjectReference Include="..\Compiler.Frontend\Compiler.Frontend.csproj"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="Tasks\array_sorting.minl">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Tasks\factorial_calculation.minl">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Tasks\prime_number_generation.minl.minl">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>
