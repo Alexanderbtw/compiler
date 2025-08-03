@@ -1,124 +1,138 @@
-# MiniLang Documentation
+# MiniLang – Reference Manual  
 
-MiniLang is a deliberately minimal, C-style teaching language used to demonstrate the full compiler tool-chain: **lexer → parser → AST → semantic checks → interpreter → code-gen**.  
-It supports integers, booleans, chars, strings, first-class arrays and user-defined functions. There is **no static typing** — all values are boxed at runtime.
+MiniLang is a **tiny, dynamically-typed, C-style language** used to exercise the
+whole *front-end* pipeline: **lexer → parser → AST builder → semantic checker
+→ tree-walking interpreter**.  *No code-generation has been written yet.*  
+Program files use the extension **`.minl`**.
 
 ---
 
-## 1 · “Hello, world!”
+## 1 · Lexical structure
 
-```ml
-fn main() {
-    print("Hello, MiniLang!");
+| Token            | Example(s)            | Notes                                                             |
+|------------------|-----------------------|-------------------------------------------------------------------|
+| **Identifiers**  | `foo`, `bar42`        | ASCII letters / digits / `_`, must **not** start with a digit     |
+| **Integer lit.** | `0`, `-42`, `123456`  | 64-bit signed (`long`)                                            |
+| **Char lit.**    | `'a'`, `'\n'`, `'\\'` | Simple C-style escapes                                            |
+| **String lit.**  | `"hi"`, `"\"x\""`     | Back-slash escapes `\"` and `\\`                                  |
+| **Keywords**     | `fn`, `var`, `if`, `else`, `while`, `for`, `break`, `continue`, `return`, `true`, `false` |
+| **Operators**    | `+ - * / % < <= > >= == != && || ! =`             | All left-associative                                               |
+| **Punctuation**  | `, ; ( ) { } [ ]`     |                                                                   |
+| **Comments**     | `// to end of line`   | Discarded by the lexer                                            |
+
+---
+
+## 2 · Types & values (run-time)
+
+| Tag    | Literal(s) | Description                                                     |
+|--------|------------|-----------------------------------------------------------------|
+| `long` | `42`       | 64-bit signed integer                                           |
+| `bool` | `true`     | Logical value                                                   |
+| `char` | `'x'`      | 16-bit Unicode scalar                                           |
+| `string` | `"foo"`  | Immutable UTF-16 sequence                                       |
+| `array`| —          | Mutable, zero-indexed `object?[]`, elements default to `null`   |
+| `null` | —          | Absence of a value                                              |
+
+---
+
+## 3 · Expressions (precedence / associativity)
+
+```
+postfixExpr      calls & indexing      (left)
+unary            +  -  !               (right)
+multiplication   *  /  %               (left)
+addition         +  -                  (left)
+comparison       <  <= > >=            (left)
+equality         == !=                 (left)
+logicalAnd       &&                    (left, short-circuit)
+logicalOr        ||                    (left, short-circuit)
+assignment       =                     (right)  value of expr is RHS
+```
+
+Truthiness rules for `if`, `while`, …  
+
+* `bool` → itself  
+* `long` → non-zero  
+* anything else → value ≠ `null`
+
+---
+
+## 4 · Statements
+
+```
+var i = 0;                // variableDecl
+if (cond) stmt            // ifStmt (+ optional else)
+while (cond) stmt         // whileStmt
+for (init; cond; iter) stmt
+break; continue;          // loop control
+return expr?;             // returnStmt
+expr;                     // exprStmt (may be empty)
+{ ... }                   // block
+```
+
+All variables are *function-local*; there are no globals.
+
+---
+
+## 5 · Functions
+
+```minl
+fn gcd(a, b) {
+    while (b != 0) {
+        var t = b;
+        b = a % b;
+        a = t;
+    }
+    return a;
 }
 ```
 
----
-
-## 2 · Lexical structure
-
-| Element            | Example(s)               | Notes                               |
-| ------------------ | ------------------------ | ----------------------------------- |
-| **Identifiers**    | `counter`, `my_var`      | ASCII letters, digits, `_` — cannot start with digit |
-| **Integer lit.**   | `0`, `42`, `-9000`       | 64-bit signed                       |
-| **Char lit.**      | `'a'`, `'\n'`            | single quotes                       |
-| **String lit.**    | `"abc"`, `"foo\nbar"`    | double quotes, supports `\"` `\\`   |
-| **Keywords**       | `fn var if else while for break continue return true false` |
-| **Operators**      | `+ - * / % < <= > >= == != && || =` |
-| **Delimiters**     | `()` `[]` `{}` `, ;`     |
-| **Comments**       | `// to end-of-line`      | (single-line only)                  |
+* No overloading; a single global namespace of functions.  
+* If execution “falls off” the end, the function yields `null`.  
+* Exactly one entry function **`main()`** with zero parameters is required.
 
 ---
 
-## 3 · Grammar (EBNF)
+## 6 · Arrays
 
-```ebnf
-program         = { functionDecl } ;
-functionDecl    = "fn" ID "(" [ paramList ] ")" block ;
-paramList       = ID { "," ID } ;
-
-block           = "{" { statement } "}" ;
-
-statement       = variableDecl
-                | ifStmt | whileStmt | forStmt
-                | breakStmt | continueStmt | returnStmt
-                | exprStmt | block ;
-
-variableDecl    = "var" ID [ "=" expression ] ";" ;
-ifStmt          = "if" "(" expression ")" statement [ "else" statement ] ;
-whileStmt       = "while" "(" expression ")" statement ;
-forStmt         = "for" "(" ( variableDecl | [ expressionList ] ";" )
-                  [ expression ] ";" [ expressionList ] ")" statement ;
-breakStmt       = "break" ";" ;
-continueStmt    = "continue" ";" ;
-returnStmt      = "return" [ expression ] ";" ;
-exprStmt        = [ expression ] ";" ;
-expressionList  = expression { "," expression } ;
-
-expression      = assignment ;
-assignment      = postfixExpr "=" assignment | logicalOr ;
-
-logicalOr       = logicalAnd { "||" logicalAnd } ;
-logicalAnd      = equality   { "&&" equality   } ;
-equality        = comparison { ("==" | "!=") comparison } ;
-comparison      = addition   { ("<" | "<=" | ">" | ">=") addition } ;
-addition        = multiplication { ("+" | "-") multiplication } ;
-multiplication  = unary { ("*" | "/" | "%") unary } ;
-unary           = ( "+" | "-" | "!" ) unary | postfixExpr ;
-
-postfixExpr     = primary { callSuffix | indexSuffix } ;
-callSuffix      = "(" [ argumentList ] ")" ;
-indexSuffix     = "[" expression "]" ;
-argumentList    = expression { "," expression } ;
-
-primary         = INT | STRING | CHAR | TRUE | FALSE | ID | "(" expression ")" ;
+```minl
+var a = array(5);  // 5 nulls
+a[0] = 123;
+print(a[0]);       // 123
 ```
 
----
-
-## 4 · Built-in functions
-
-| Name           | Arity | Description                                 |
-| -------------- | ----- | ------------------------------------------- |
-| `print`        | 1     | Writes value followed by newline            |
-| `array`        | 1     | Allocates fresh array of length **n** (filled with `null`) |
-| `time_ms`      | 0     | Returns current wall clock time (ms)        |
-| `rand`         | 0     | Pseudo-random 64-bit integer                |
+Indices are bounds-checked; a violation raises  
+`RuntimeException: array index out of bounds`.
 
 ---
 
-## 5 · Semantics
+## 7 · Built-in functions (fully implemented)
 
-* **Values** — Boxed `object?`.  
-  Only `long`, `bool`, `char`, `string`, `object?[]` and `null` appear at runtime.
-* **Arithmetic** — Operands are converted with `ToLong`; `null` is illegal.
-* **Truthiness** — `bool` → itself, `long` → `n ≠ 0`, others → non-null.
-* **Arrays** — Zero-based, bounds-checked; elements default to `null`.
-* **Variables** — Dynamically scoped inside each function frame.
-* **Functions** — Always return `object?` (default `null`). Recursive calls allowed.
-* **Control flow** — `break`/`continue` only valid inside `while`/`for`.
+| Name        | Arity | Behaviour                                             |
+|-------------|-------|-------------------------------------------------------|
+| `array(n)`  | 1     | Fresh array of length **n** (all elements `null`)     |
+| `print(x)`  | 1     | Text representation of **x** followed by newline      |
 
 ---
 
-## 6 · Examples
+## 8 · Complete example programs
 
-### 6.1 · Recursive factorial
+### 8.1 Factorial (recursive) – `fact.minl`
 
-```ml
+```minl
 fn fact(n) {
     if (n <= 1) return 1;
     return n * fact(n - 1);
 }
 
 fn main() {
-    var i = 10;
-    print(fact(i));
+    print(fact(10));  // 3628800
 }
 ```
 
-### 6.2 · In-place quick-sort
+### 8.2 Quick-sort – `qsort.minl`
 
-```ml
+```minl
 fn qsort(arr, lo, hi) {
     if (lo >= hi) return;
     var p = arr[(lo + hi) / 2];
@@ -145,9 +159,9 @@ fn main() {
 }
 ```
 
-### 6.3 · Prime sieve
+### 8.3 Prime sieve – `sieve.minl`
 
-```ml
+```minl
 fn sieve(limit) {
     var isPrime = array(limit + 1);
     var i = 2;
@@ -170,41 +184,32 @@ fn main() { sieve(100); }
 
 ---
 
-## 7 · Tool-chain stages
+## 9 · Diagnostic messages
 
-| Stage             | Output                              | Purpose                                  |
-| ----------------- | ----------------------------------- | ---------------------------------------- |
-| **Lexer**         | token stream                        | split into keywords, identifiers, …      |
-| **Parser**        | concrete syntax tree (ANTLR)        | enforce grammar                          |
-| **AST builder**   | cleaned abstract syntax tree        | remove tokens, keep structure            |
-| **Semantic check**| annotated AST                       | scope, arity, control-flow validity      |
-| **Interpreter**   | value                               | fast turnaround while compiler matures   |
-| **Lowering**      | three-address code (TAC)            | simplifies code-gen + enables optims     |
-| **Back-end**      | IL / C / ASM / LLVM                | executable program                       |
+| Phase          | Example message                               |
+|----------------|-----------------------------------------------|
+| Lexing         | `line 3: unterminated string literal`         |
+| Parsing        | `line 7: mismatched input '}' expecting ';'`  |
+| Semantic check | `identifier 'i' not in scope`                 |
+| Runtime        | `array index out of bounds`                   |
 
-Run all stages via CLI:
+Compilation halts on the first error; the interpreter exits with code 1.
 
-```bash
-minic --emit-ast   prog.ml      # pretty-print AST
-minic --check      prog.ml      # semantic only
-minic --run        prog.ml      # interpret
-minic --emit-tac   prog.ml      # dump lowered IR
-minic -o prog.exe  prog.ml      # compile to native/IL and link
+---
+
+## 10 · Implementation notes (for contributors)
+
+Directory layout:
+
+```
+Frontend/
+  Lexer/           MiniLangLexer.g4
+  Parser/          MiniLangParser.g4
+  AST/             *.cs   // immutable record types
+  Semantics/       SemanticChecker.cs
+  Interpretation/  Interpreter.cs
+Tests/              // xUnit suites: lexer, parser, AST, semantics, interpreter
 ```
 
----
-
-## 8 · Future ideas
-
-* Static type inference (Hindley-Milner lite).
-* First-class tuples & pattern matching.
-* SSA + register allocation backend.
-* REPL with incremental compilation.
-
----
-
-### Changelog
-
-| Version | Date       | Notes                                       |
-| ------- | ---------- | ------------------------------------------- |
-| 0.1     | 2025-08-02 | Initial public draft                        |
+* Style – run `dotnet format`.  
+* Use `Interpreter.Run(true)` to get execution-time traces.
