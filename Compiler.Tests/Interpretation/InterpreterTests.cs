@@ -87,15 +87,15 @@ public class InterpreterTests
                 qsort(arr, i,  hi);
             }
             fn main() {
-                var a = array(2);
+                var a = array(10);
                 var k=0;
-                while (k<2){ a[k]=9-k; k=k+1; }   // 9..0
+                while (k<10){ a[k]=9-k; k=k+1; }   // 9..0
                 qsort(a,0,9);
                 k=0; while(k<10){ print(a[k]); k=k+1; }
             }";
 
         (_, string stdout) = Run(src);
-        Assert.Equal("0\r\n1\r\n2\r\n3\r\n4\r\n5\r\n6\r\n7\r\n8\r\n9", stdout.Replace(" ", ""));
+        Assert.Equal("0\n1\n2\n3\n4\n5\n6\n7\n8\n9", stdout.Replace(" ", ""));
     }
 
     private static (object? value, string stdout) Run(string src, bool time = false)

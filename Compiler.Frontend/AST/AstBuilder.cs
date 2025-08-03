@@ -166,6 +166,8 @@ public sealed class AstBuilder : MiniLangParserBaseVisitor<object>
             ? Visit(ctx.unary(0))
             : BuildLeftAssoc(ctx.unary(), ExtractOps(ctx, "*", "/", "%"));
 
+    public override object VisitParens(MiniLangParser.ParensContext ctx) => Visit(ctx.expression());
+
     public override object VisitPostfixExpr(MiniLangParser.PostfixExprContext ctx)
     {
         var expr = (Expr)Visit(ctx.primary());

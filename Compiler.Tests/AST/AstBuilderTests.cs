@@ -2,11 +2,9 @@ using Compiler.Frontend.AST;
 using Compiler.Frontend.AST.Expressions;
 using Compiler.Frontend.AST.Statements;
 
-using Xunit.Abstractions;
-
 namespace Compiler.Tests.AST;
 
-public class AstBuilderTests()
+public class AstBuilderTests
 {
     [Fact]
     public void CharLiteralNodePresent()
@@ -51,23 +49,24 @@ public class AstBuilderTests()
         switch (e)
         {
             case BinExpr b:
-                foreach (var sub in FlattenExpr(b.L)) yield return sub;
-                foreach (var sub in FlattenExpr(b.R)) yield return sub;
+                foreach (Expr sub in FlattenExpr(b.L)) yield return sub;
+                foreach (Expr sub in FlattenExpr(b.R)) yield return sub;
                 break;
 
             case UnExpr u:
-                foreach (var sub in FlattenExpr(u.R)) yield return sub;
+                foreach (Expr sub in FlattenExpr(u.R)) yield return sub;
                 break;
 
             case CallExpr c:
-                foreach (var sub in FlattenExpr(c.Callee)) yield return sub;
-                foreach (var a in c.A)
-                foreach (var sub in FlattenExpr(a)) yield return sub;
+                foreach (Expr sub in FlattenExpr(c.Callee)) yield return sub;
+                foreach (Expr a in c.A)
+                foreach (Expr sub in FlattenExpr(a))
+                    yield return sub;
                 break;
 
             case IndexExpr ix:
-                foreach (var sub in FlattenExpr(ix.Arr)) yield return sub;
-                foreach (var sub in FlattenExpr(ix.Index)) yield return sub;
+                foreach (Expr sub in FlattenExpr(ix.Arr)) yield return sub;
+                foreach (Expr sub in FlattenExpr(ix.Index)) yield return sub;
                 break;
         }
     }
@@ -131,9 +130,8 @@ public class AstBuilderTests()
 
         ProgramAst ast = AstAssert.Ast(src);
 
-        // Gather every expression in the program
         List<Expr> exprs = ast.Functions
-            .SelectMany(f => FlattenStmts(f.Body)) // recurse through the function body
+            .SelectMany(f => FlattenStmts(f.Body))
             .ToList();
 
         Assert.Contains(exprs, e => e is IndexExpr); // arr[0]
