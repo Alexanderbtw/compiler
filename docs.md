@@ -1,4 +1,3 @@
-<pre>
 # MiniLang Documentation
 
 MiniLang is a deliberately minimal, C-style teaching language used to demonstrate the full compiler tool-chain: **lexer → parser → AST → semantic checks → interpreter → code-gen**.  
@@ -209,4 +208,3 @@ minic -o prog.exe  prog.ml      # compile to native/IL and link
 | Version | Date       | Notes                                       |
 | ------- | ---------- | ------------------------------------------- |
 | 0.1     | 2025-08-02 | Initial public draft                        |
-</pre>
