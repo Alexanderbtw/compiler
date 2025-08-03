@@ -111,7 +111,8 @@ Indices are bounds-checked; a violation raises
 | Name        | Arity | Behaviour                                             |
 |-------------|-------|-------------------------------------------------------|
 | `array(n)`  | 1     | Fresh array of length **n** (all elements `null`)     |
-| `print(x)`  | 1     | Text representation of **x** followed by newline      |
+| `print(x)`  | ...   | Text representation of **x** followed by newline      |
+| `clock_ms`  | 0     | Gets the number of milliseconds elapsed since the system started |
 
 ---
 
