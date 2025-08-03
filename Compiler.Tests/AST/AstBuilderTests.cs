@@ -6,10 +6,8 @@ using Xunit.Abstractions;
 
 namespace Compiler.Tests.AST;
 
-public class AstBuilderTests
+public class AstBuilderTests()
 {
-    private readonly ITestOutputHelper _testOutputHelper;
-    public AstBuilderTests(ITestOutputHelper testOutputHelper) => _testOutputHelper = testOutputHelper;
     [Fact]
     public void CharLiteralNodePresent()
     {
@@ -44,25 +42,35 @@ public class AstBuilderTests
         Assert.Equal(2, fact.Body.Body.Count);
     }
 
-    private static IEnumerable<Expr> FlattenExpr(Expr e) => e switch
+    private static IEnumerable<Expr> FlattenExpr(Expr? e)
     {
-        BinExpr b => new[] { b }
-            .Concat(FlattenExpr(b.L))
-            .Concat(FlattenExpr(b.R)),
+        if (e == null) yield break;
 
-        UnExpr u => new[] { u }
-            .Concat(FlattenExpr(u.R)),
+        yield return e;
 
-        CallExpr c => new[] { c }
-            .Concat(FlattenExpr(c.Callee))
-            .Concat(c.A.SelectMany(FlattenExpr)),
+        switch (e)
+        {
+            case BinExpr b:
+                foreach (var sub in FlattenExpr(b.L)) yield return sub;
+                foreach (var sub in FlattenExpr(b.R)) yield return sub;
+                break;
 
-        IndexExpr i => new[] { i }
-            .Concat(FlattenExpr(i.Arr))
-            .Concat(FlattenExpr(i.Index)),
+            case UnExpr u:
+                foreach (var sub in FlattenExpr(u.R)) yield return sub;
+                break;
 
-        _ => [e]
-    };
+            case CallExpr c:
+                foreach (var sub in FlattenExpr(c.Callee)) yield return sub;
+                foreach (var a in c.A)
+                foreach (var sub in FlattenExpr(a)) yield return sub;
+                break;
+
+            case IndexExpr ix:
+                foreach (var sub in FlattenExpr(ix.Arr)) yield return sub;
+                foreach (var sub in FlattenExpr(ix.Index)) yield return sub;
+                break;
+        }
+    }
 
     private static IEnumerable<Expr> FlattenStmts(Stmt s) => s switch
     {

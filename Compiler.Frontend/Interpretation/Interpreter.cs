@@ -14,6 +14,11 @@ using Compiler.Frontend.Semantic.Exceptions;
 namespace Compiler.Frontend.Interpretation;
 
 /// <summary>Tree-walking interpreter for MiniLang.</summary>
+/// <summary>
+///     Interpreter for our AST-based language. Supports integers, booleans,
+///     strings, arrays, variables, control flow (if/while/for), function calls,
+///     built-ins, and return signals.
+/// </summary>
 public class Interpreter
 {
     private readonly Dictionary<string, FuncDef> _funcs;
@@ -28,42 +33,61 @@ public class Interpreter
 
     private static object? ApplyBinary(string op, object? l, object? r) => op switch
     {
-        "+" => (long)l! + (long)r!,
-        "-" => (long)l! - (long)r!,
-        "*" => (long)l! * (long)r!,
-        "/" => (long)l! / (long)r!,
-        "%" => (long)l! % (long)r!,
+        "+" => ToLong(l) + ToLong(r),
+        "-" => ToLong(l) - ToLong(r),
+        "*" => ToLong(l) * ToLong(r),
+        "/" => ToLong(l) / ToLong(r),
+        "%" => ToLong(l) % ToLong(r),
 
-        "<" => (long)l! < (long)r!,
-        "<=" => (long)l! <= (long)r!,
-        ">" => (long)l! > (long)r!,
-        ">=" => (long)l! >= (long)r!,
+        "<" => ToLong(l) < ToLong(r),
+        "<=" => ToLong(l) <= ToLong(r),
+        ">" => ToLong(l) > ToLong(r),
+        ">=" => ToLong(l) >= ToLong(r),
 
         "==" => Equals(l, r),
         "!=" => !Equals(l, r),
 
-        "&&" => IsTrue(l) ? r : false,
-        "||" => IsTrue(l) ? true : r,
+        // Fixed: coerce both sides to bool
+        "&&" => IsTrue(l) && IsTrue(r),
+        "||" => IsTrue(l) || IsTrue(r),
 
         _ => throw new RuntimeException($"binary op '{op}' not implemented")
     };
 
     private static object? ApplyUnary(string op, object? r) => op switch
     {
-        "-" => -(long)r!,
+        "-" => -ToLong(r),
         "!" => !IsTrue(r),
         _ => throw new RuntimeException($"unknown unary op '{op}'")
     };
 
+    private static object? ArrayGet(object? arrObj, int index)
+    {
+        if (arrObj is not Array arr)
+            throw new RuntimeException("indexing a non-array value");
+        if (index < 0 || index >= arr.Length)
+            throw new RuntimeException("array index out of bounds");
+        return arr.GetValue(index);
+    }
+
+    private static void ArraySet(object? arrObj, int index, object? value)
+    {
+        if (arrObj is not Array arr)
+            throw new RuntimeException("indexing a non-array value");
+        if (index < 0 || index >= arr.Length)
+            throw new RuntimeException("array index out of bounds");
+        arr.SetValue(value, index);
+    }
+
     private object? Call(string name, object?[] args)
     {
-        // 1) built-ins
-        if (Builtins.TryInvoke(name, args, out object? builtin)) return builtin;
+        // 1. Built-ins
+        if (Builtins.TryInvoke(name, args, out object? builtin))
+            return builtin;
 
-        // 2) user function
+        // 2. User function
         if (!_funcs.TryGetValue(name, out FuncDef? f))
             throw new RuntimeException($"undefined function '{name}'");
-
         if (f.Params.Count != args.Length)
             throw new RuntimeException(
                 $"call to '{name}' expects {f.Params.Count} args, got {args.Length}");
@@ -73,62 +97,53 @@ public class Interpreter
             frame.Locals[f.Params[i]] = args[i];
 
         _stack.Push(frame);
-        try { ExecBlock(f.Body); }
-        catch (ReturnSignal r)
+        try
+        {
+            ExecBlock(f.Body);
+        }
+        catch (ReturnSignal ret)
         {
             _stack.Pop();
-            return r.Value;
+            return ret.Value;
         }
         _stack.Pop();
         return null;
     }
 
-    private object? Eval(Expr? e)
+    private object? Eval(Expr? e) => e switch
     {
-        return e switch
-        {
-            null => null,
+        null => null,
+        IntLit i => i.Value,
+        CharLit c => c.Value,
+        StringLit s => s.Value,
+        BoolLit b => b.Value,
+        VarExpr v => Lookup(v.Name),
+        UnExpr u => ApplyUnary(u.Op, Eval(u.R)),
+        BinExpr { Op: "=" } a => EvalAssign(a),
+        BinExpr b => ApplyBinary(b.Op, Eval(b.L), Eval(b.R)),
+        CallExpr c => Call(
+            ((VarExpr)c.Callee).Name,
+            c.A.Select(arg => Eval(arg)).ToArray()),
+        IndexExpr ix => ArrayGet(
+            Eval(ix.Arr),
+            (int)ToLong(Eval(ix.Index))),
+        _ => throw new RuntimeException($"expr {e.GetType().Name} not implemented")
+    };
 
-            IntLit i => i.Value,
-            CharLit c => c.Value,
-            StringLit s => s.Value,
-            BoolLit b => b.Value,
-
-            VarExpr v => Lookup(v.Name),
-
-            UnExpr u => ApplyUnary(u.Op, Eval(u.R)),
-
-            BinExpr { Op: "=" } a => EvalAssign(a),
-
-            BinExpr b => ApplyBinary(b.Op, Eval(b.L), Eval(b.R)),
-
-            CallExpr c => Call(
-                ((VarExpr)c.Callee).Name,
-                c.A.Select(a => Eval(a)).ToArray()),
-
-            IndexExpr ix =>
-                ((object?[])Eval(ix.Arr)!)
-                [Convert.ToInt32(Eval(ix.Index))],
-
-            _ => throw new RuntimeException($"expr {e.GetType().Name} not implemented")
-        };
-    }
     private object? EvalAssign(BinExpr a)
     {
         object? value = Eval(a.R);
-
         switch (a.L)
         {
             case VarExpr v:
                 SetVar(v.Name, value);
                 return value;
-
             case IndexExpr ix:
-                var arr = (object?[])Eval(ix.Arr)!;
-                var idx = Convert.ToInt32(Eval(ix.Index));
-                arr[idx] = value;
+                ArraySet(
+                    Eval(ix.Arr),
+                    (int)ToLong(Eval(ix.Index)),
+                    value);
                 return value;
-
             default:
                 throw new RuntimeException("invalid assignment target");
         }
@@ -152,42 +167,27 @@ public class Interpreter
             case VarDecl v:
                 _stack.Peek().Locals[v.Name] = Eval(v.Init);
                 break;
-
             case ExprStmt e:
                 if (e.E != null) Eval(e.E);
                 break;
-
             case Return r:
                 throw new ReturnSignal(Eval(r.Value));
-
             case IfStmt ifs:
                 if (IsTrue(Eval(ifs.Cond))) ExecStmt(ifs.Then);
                 else if (ifs.Else != null) ExecStmt(ifs.Else);
                 break;
-
             case WhileStmt w:
                 while (IsTrue(Eval(w.Cond)))
-                {
                     try { ExecStmt(w.Body); }
-                    catch (ContinueSignal)
-                    {
-                    }
+                    catch (ContinueSignal) { }
                     catch (BreakSignal) { break; }
-                }
                 break;
-
             case ForStmt f:
                 ExecOptional(f.Init);
                 while (f.Cond == null || IsTrue(Eval(f.Cond)))
                 {
-                    try
-                    {
-                        ExecStmt(f.Body);
-                    }
-                    catch (ContinueSignal)
-                    {
-                        /* fall through */
-                    }
+                    try { ExecStmt(f.Body); }
+                    catch (ContinueSignal) { }
                     catch (BreakSignal) { break; }
 
                     if (f.Iter != null)
@@ -195,13 +195,15 @@ public class Interpreter
                             Eval(iter);
                 }
                 break;
-
-            case Break: throw new BreakSignal();
-            case Continue: throw new ContinueSignal();
-
-            case Block b: ExecBlock(b); break;
-
-            default: throw new RuntimeException($"stmt {s.GetType().Name} not implemented");
+            case Break:
+                throw new BreakSignal();
+            case Continue:
+                throw new ContinueSignal();
+            case Block b:
+                ExecBlock(b);
+                break;
+            default:
+                throw new RuntimeException($"stmt {s.GetType().Name} not implemented");
         }
     }
 
@@ -214,7 +216,7 @@ public class Interpreter
 
     private object? Lookup(string name)
     {
-        foreach (Frame frame in _stack) // from innermost to outer
+        foreach (Frame frame in _stack)
             if (frame.Locals.TryGetValue(name, out object? v))
                 return v;
         throw new RuntimeException($"unbound variable '{name}'");
@@ -228,6 +230,7 @@ public class Interpreter
             Console.WriteLine($"⏱ {sw!.ElapsedMilliseconds} ms");
         return result;
     }
+
     private void SetVar(string name, object? val)
     {
         foreach (Frame frame in _stack)
@@ -238,6 +241,14 @@ public class Interpreter
             }
         throw new RuntimeException($"unbound variable '{name}'");
     }
+
+    private static long ToLong(object? v) => v switch
+    {
+        long n => n,
+        bool b => b ? 1 : 0,
+        null => throw new RuntimeException("null used where integer expected"),
+        _ => throw new RuntimeException($"cannot use {v.GetType().Name} in arithmetic")
+    };
 
     private sealed class Frame
     {

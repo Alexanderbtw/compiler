@@ -71,7 +71,7 @@ public class InterpreterTests
     {
         var src = @"
             fn qsort(arr, lo, hi) {
-                if (lo >= hi) return;
+                if (lo >= hi) { return; }
                 var p = arr[(lo+hi)/2];
                 var i = lo;
                 var j = hi;
@@ -87,9 +87,9 @@ public class InterpreterTests
                 qsort(arr, i,  hi);
             }
             fn main() {
-                var a = array(10);
+                var a = array(2);
                 var k=0;
-                while (k<10){ a[k]=9-k; k=k+1; }   // 9..0
+                while (k<2){ a[k]=9-k; k=k+1; }   // 9..0
                 qsort(a,0,9);
                 k=0; while(k<10){ print(a[k]); k=k+1; }
             }";

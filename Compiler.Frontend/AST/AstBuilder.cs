@@ -72,7 +72,7 @@ public sealed class AstBuilder : MiniLangParserBaseVisitor<object>
     {
         var list = new List<Expr>();
         foreach (MiniLangParser.ExpressionContext? e in ctx.expression())
-            list.Add((Expr)Visit(e)); // use this visitor
+            list.Add((Expr)Visit(e));
         return list;
     }
 
@@ -175,7 +175,7 @@ public sealed class AstBuilder : MiniLangParserBaseVisitor<object>
         {
             switch (child)
             {
-                // ── a [...] suffix ───────────────────────────────
+                // a [...] suffix
                 case MiniLangParser.IndexSuffixContext idx:
                 {
                     var indexExpr = (Expr)Visit(idx.expression());
@@ -183,7 +183,7 @@ public sealed class AstBuilder : MiniLangParserBaseVisitor<object>
                     break;
                 }
 
-                // ── a (...) suffix ───────────────────────────────
+                // a (...) suffix
                 case MiniLangParser.CallSuffixContext call:
                 {
                     List<Expr> args = call.argumentList() == null
@@ -248,5 +248,3 @@ public sealed class AstBuilder : MiniLangParserBaseVisitor<object>
         (Expr)Visit(ctx.expression()),
         (Stmt)Visit(ctx.statement()));
 }
-
-public record ProgramAst(List<FuncDef> Functions); // tiny root wrapper
