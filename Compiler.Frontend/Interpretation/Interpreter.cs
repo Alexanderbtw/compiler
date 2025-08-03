@@ -8,9 +8,8 @@ using Compiler.Frontend.AST.Expressions;
 using Compiler.Frontend.AST.Statements;
 using Compiler.Frontend.Interpretation.Exceptions;
 using Compiler.Frontend.Interpretation.Signals;
-using Compiler.Frontend.Semantic;
+using Compiler.Frontend.Metadata;
 using Compiler.Frontend.Semantic.Exceptions;
-using Compiler.Frontend.Services;
 
 namespace Compiler.Frontend.Interpretation;
 
@@ -45,8 +44,6 @@ public class Interpreter
 
         "&&" => IsTrue(l) ? r : false,
         "||" => IsTrue(l) ? true : r,
-
-        "=" => throw new RuntimeException("assignment handled at stmt level"),
 
         _ => throw new RuntimeException($"binary op '{op}' not implemented")
     };
@@ -101,21 +98,40 @@ public class Interpreter
 
             UnExpr u => ApplyUnary(u.Op, Eval(u.R)),
 
+            BinExpr { Op: "=" } a => EvalAssign(a),
+
             BinExpr b => ApplyBinary(b.Op, Eval(b.L), Eval(b.R)),
 
             CallExpr c => Call(
                 ((VarExpr)c.Callee).Name,
                 c.A.Select(a => Eval(a)).ToArray()),
 
-            IndexExpr ix => () =>
-            {
-                var arr = (object?[])Eval(ix.Arr)!;
-                var idx = Convert.ToInt32(Eval(ix.Index));
-                return arr[idx];
-            },
+            IndexExpr ix =>
+                ((object?[])Eval(ix.Arr)!)
+                [Convert.ToInt32(Eval(ix.Index))],
 
             _ => throw new RuntimeException($"expr {e.GetType().Name} not implemented")
         };
+    }
+    private object? EvalAssign(BinExpr a)
+    {
+        object? value = Eval(a.R);
+
+        switch (a.L)
+        {
+            case VarExpr v:
+                SetVar(v.Name, value);
+                return value;
+
+            case IndexExpr ix:
+                var arr = (object?[])Eval(ix.Arr)!;
+                var idx = Convert.ToInt32(Eval(ix.Index));
+                arr[idx] = value;
+                return value;
+
+            default:
+                throw new RuntimeException("invalid assignment target");
+        }
     }
 
     private void ExecBlock(Block b)
@@ -124,9 +140,9 @@ public class Interpreter
             ExecStmt(s);
     }
 
-    private static void ExecOptional(Stmt? s)
+    private void ExecOptional(Stmt? s)
     {
-        if (s != null) ExecOptional(s);
+        if (s != null) ExecStmt(s);
     }
 
     private void ExecStmt(Stmt s)
@@ -212,10 +228,19 @@ public class Interpreter
             Console.WriteLine($"⏱ {sw!.ElapsedMilliseconds} ms");
         return result;
     }
+    private void SetVar(string name, object? val)
+    {
+        foreach (Frame frame in _stack)
+            if (frame.Locals.ContainsKey(name))
+            {
+                frame.Locals[name] = val;
+                return;
+            }
+        throw new RuntimeException($"unbound variable '{name}'");
+    }
 
     private sealed class Frame
     {
         public readonly Dictionary<string, object?> Locals = new();
     }
 }
-

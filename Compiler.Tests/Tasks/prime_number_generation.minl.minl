@@ -1,0 +1,6 @@
+namespace Compiler.Tests.Tasks;
+
+public interface prime_number_generation_minl
+{
+    
+}

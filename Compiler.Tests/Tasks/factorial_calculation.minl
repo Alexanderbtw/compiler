@@ -1,0 +1,12 @@
+fn fact(n) {
+    if (n <= 1) return 1;
+    return n * fact(n - 1);
+}
+
+fn main() {
+    var n = 20;
+    var start = clock_ms();
+    var r = fact(n);
+    var end  = clock_ms();
+    print("20! = ", r, " execution time: ", end - start, " ms");
+}

@@ -30,4 +30,7 @@
         <NoWarn>3021;1701;1702</NoWarn>
     </PropertyGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="Compiler.Tests"/>
+    </ItemGroup>
 </Project>
