@@ -1,14 +1,13 @@
-﻿using System;
-using System.IO;
-
-using Antlr4.Runtime;
+﻿using Antlr4.Runtime;
 
 using Compiler.Frontend;
 using Compiler.Translation.HIR;
 using Compiler.Translation.HIR.Common;
 using Compiler.Translation.HIR.Semantic;
+using Compiler.Translation.MIR;
+using Compiler.Translation.MIR.Common;
 
-namespace Compiler.Interpreter;
+namespace Compiler.Backend.CLR;
 
 public class Program
 {
@@ -54,11 +53,11 @@ public class Program
         }
         Console.ResetColor();
 
-        var semanticChecker = new SemanticChecker();
-        semanticChecker.Check(hir);
+        new SemanticChecker().Check(hir);
 
-        var interpreter = new Interpreter(hir);
-        object? obj = interpreter.Run();
-        Console.WriteLine(obj);
+        MirModule mir = new HirToMir().Lower(hir);
+        var backend = new CilBackend();
+        object? result = backend.RunMain(mir);
+        if (result is not null) Console.WriteLine($"[ret] {result}");
     }
 }

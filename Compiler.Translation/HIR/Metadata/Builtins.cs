@@ -1,4 +1,4 @@
-namespace Compiler.Translation.Metadata;
+namespace Compiler.Translation.HIR.Metadata;
 
 using static BuiltinAttr;
 

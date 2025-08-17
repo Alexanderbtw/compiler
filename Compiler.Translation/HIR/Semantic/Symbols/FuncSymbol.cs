@@ -1,6 +1,4 @@
-using System.Collections.Generic;
-
-namespace Compiler.Translation.Semantic.Symbols;
+namespace Compiler.Translation.HIR.Semantic.Symbols;
 
 internal record FuncSymbol(
     string Name,

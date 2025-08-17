@@ -8,10 +8,9 @@ using Compiler.Interpreter.Signals;
 using Compiler.Translation.HIR.Common;
 using Compiler.Translation.HIR.Expressions;
 using Compiler.Translation.HIR.Expressions.Abstractions;
+using Compiler.Translation.HIR.Semantic.Exceptions;
 using Compiler.Translation.HIR.Statements;
 using Compiler.Translation.HIR.Statements.Abstractions;
-using Compiler.Translation.Metadata;
-using Compiler.Translation.Semantic.Exceptions;
 
 namespace Compiler.Interpreter;
 

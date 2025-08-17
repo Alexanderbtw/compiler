@@ -1,18 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 using Compiler.Translation.HIR.Common;
 using Compiler.Translation.HIR.Expressions;
 using Compiler.Translation.HIR.Expressions.Abstractions;
+using Compiler.Translation.HIR.Metadata;
+using Compiler.Translation.HIR.Semantic.Exceptions;
+using Compiler.Translation.HIR.Semantic.Symbols;
 using Compiler.Translation.HIR.Statements;
 using Compiler.Translation.HIR.Statements.Abstractions;
 using Compiler.Translation.HIR.Stringify;
-using Compiler.Translation.Metadata;
-using Compiler.Translation.Semantic.Exceptions;
-using Compiler.Translation.Semantic.Symbols;
 
-namespace Compiler.Translation.Semantic;
+namespace Compiler.Translation.HIR.Semantic;
 
 public sealed class SemanticChecker
 {

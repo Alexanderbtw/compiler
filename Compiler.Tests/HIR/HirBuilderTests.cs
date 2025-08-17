@@ -1,11 +1,10 @@
-using Compiler.Tests.HIR;
 using Compiler.Translation.HIR.Common;
 using Compiler.Translation.HIR.Expressions;
 using Compiler.Translation.HIR.Expressions.Abstractions;
 using Compiler.Translation.HIR.Statements;
 using Compiler.Translation.HIR.Statements.Abstractions;
 
-namespace Compiler.Tests.Hir;
+namespace Compiler.Tests.HIR;
 
 public class HirBuilderTests
 {

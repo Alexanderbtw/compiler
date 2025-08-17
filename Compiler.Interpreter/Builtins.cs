@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 
 using Compiler.Interpreter.Exceptions;
-using Compiler.Translation.Metadata;
+using Compiler.Translation.HIR.Metadata;
 
-using CommonBuiltins = Compiler.Translation.Metadata.Builtins;
+using CommonBuiltins = Compiler.Translation.HIR.Metadata.Builtins;
 
 namespace Compiler.Interpreter;
 

@@ -3,8 +3,8 @@ using Antlr4.Runtime;
 using Compiler.Frontend;
 using Compiler.Translation.HIR;
 using Compiler.Translation.HIR.Common;
-using Compiler.Translation.Semantic;
-using Compiler.Translation.Semantic.Exceptions;
+using Compiler.Translation.HIR.Semantic;
+using Compiler.Translation.HIR.Semantic.Exceptions;
 
 namespace Compiler.Tests.Semantic;
 

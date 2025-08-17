@@ -1,6 +1,4 @@
-using System;
-
-namespace Compiler.Translation.Metadata;
+namespace Compiler.Translation.HIR.Metadata;
 
 [Flags]
 public enum BuiltinAttr

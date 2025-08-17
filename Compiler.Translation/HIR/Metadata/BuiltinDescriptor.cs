@@ -1,4 +1,4 @@
-namespace Compiler.Translation.Metadata;
+namespace Compiler.Translation.HIR.Metadata;
 
 public sealed record BuiltinDescriptor(
     string Name,
