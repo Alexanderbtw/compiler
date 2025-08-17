@@ -3,19 +3,33 @@ using System.Text;
 using Antlr4.Runtime;
 
 using Compiler.Frontend;
-using Compiler.Frontend.AST;
-using Compiler.Frontend.Interpretation;
-using Compiler.Frontend.Semantic;
+using Compiler.Translation.HIR;
+using Compiler.Translation.HIR.Common;
+using Compiler.Translation.Semantic;
 
 namespace Compiler.Tests.Interpretation;
 
 internal static class Utils
 {
-    private static ProgramAst BuildAst(string src)
+    public static (object? value, string stdout) Run(string src, bool time = false)
+    {
+        ProgramHir ast = BuildAst(src);
+        var interp = new Interpreter.Interpreter(ast);
+
+        var sb = new StringBuilder();
+        using var writer = new StringWriter(sb);
+        TextWriter old = Console.Out;
+        Console.SetOut(writer);
+        object? ret = interp.Run(time);
+        Console.SetOut(old);
+
+        return (ret, sb.ToString().TrimEnd());
+    }
+    private static ProgramHir BuildAst(string src)
     {
         MiniLangParser parser = CreateParser(src);
         MiniLangParser.ProgramContext? tree = parser.program();
-        ProgramAst ast = new AstBuilder().Build(tree);
+        ProgramHir ast = new HirBuilder().Build(tree);
         new SemanticChecker().Check(ast);
         return ast;
     }
@@ -27,20 +41,5 @@ internal static class Utils
         var parser = new MiniLangParser(tokens);
 
         return parser;
-    }
-
-    public static (object? value, string stdout) Run(string src, bool time = false)
-    {
-        ProgramAst ast = BuildAst(src);
-        var interp = new Interpreter(ast);
-
-        var sb = new StringBuilder();
-        using var writer = new StringWriter(sb);
-        TextWriter old = Console.Out;
-        Console.SetOut(writer);
-        object? ret = interp.Run(time);
-        Console.SetOut(old);
-
-        return (ret, sb.ToString().TrimEnd());
     }
 }

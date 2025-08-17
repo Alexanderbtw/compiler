@@ -26,6 +26,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Compiler.Frontend\Compiler.Frontend.csproj"/>
+        <ProjectReference Include="..\Compiler.Interpreter\Compiler.Interpreter.csproj" />
+        <ProjectReference Include="..\Compiler.Translation\Compiler.Translation.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -35,7 +37,7 @@
       <None Update="Tasks\factorial_calculation.minl">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Tasks\prime_number_generation.minl.minl">
+      <None Update="Tasks\prime_number_generation.minl">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>

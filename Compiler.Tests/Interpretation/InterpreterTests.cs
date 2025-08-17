@@ -1,10 +1,3 @@
-using System.Text;
-
-using Compiler.Frontend;
-using Compiler.Frontend.AST;
-using Compiler.Frontend.Interpretation;
-using Compiler.Frontend.Semantic;
-
 namespace Compiler.Tests.Interpretation;
 
 public class InterpreterTests
@@ -36,11 +29,11 @@ public class InterpreterTests
             fn main(){
                 var a = array(3);
                 a[0] = 7;
-                print(""val="", a[0]);
+                print(""val"", ""="", a[0]);
             }";
 
         (_, string stdout) = Utils.Run(src);
-        Assert.Equal("val=7", stdout); // printed correctly
+        Assert.Equal("val = 7", stdout); // printed correctly
     }
 
     [Fact]
@@ -55,6 +48,14 @@ public class InterpreterTests
 
         (object? value, _) = Utils.Run(src);
         Assert.Equal(2432902008176640000L, value);
+    }
+
+    [Fact]
+    public void IndexExprReturnsValue()
+    {
+        var src = @"fn main(){ var a=array(1); a[0]=99; print(a[0]); }";
+        (_, string outTxt) = Utils.Run(src);
+        Assert.Equal("99", outTxt);
     }
 
     [Fact]
@@ -113,13 +114,5 @@ public class InterpreterTests
 
         (object? res, _) = Utils.Run(src);
         Assert.Equal(3245L, res); // reference count of primes ≤ 30000
-    }
-
-    [Fact]
-    public void IndexExprReturnsValue()
-    {
-        var src = @"fn main(){ var a=array(1); a[0]=99; print(a[0]); }";
-        var (_, outTxt) = Utils.Run(src);
-        Assert.Equal("99", outTxt);
     }
 }

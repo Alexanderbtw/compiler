@@ -1,9 +1,10 @@
 using Antlr4.Runtime;
 
 using Compiler.Frontend;
-using Compiler.Frontend.AST;
-using Compiler.Frontend.Semantic;
-using Compiler.Frontend.Semantic.Exceptions;
+using Compiler.Translation.HIR;
+using Compiler.Translation.HIR.Common;
+using Compiler.Translation.Semantic;
+using Compiler.Translation.Semantic.Exceptions;
 
 namespace Compiler.Tests.Semantic;
 
@@ -20,29 +21,6 @@ public class SemanticCheckerTests
             }
             fn main(){ print(fact(5)); }
         ");
-    }
-
-    private static ProgramAst BuildAst(string src)
-    {
-        ICharStream? input = CharStreams.fromString(src);
-        var lexer = new MiniLangLexer(input);
-        var tokens = new CommonTokenStream(lexer);
-        var parser = new MiniLangParser(tokens);
-        ProgramAst ast = new AstBuilder().Build(parser.program());
-        return ast;
-    }
-
-    private static void CheckFails(string src, string expectedMsgPart)
-    {
-        var checker = new SemanticChecker();
-        var ex = Assert.Throws<SemanticException>(() => checker.Check(BuildAst(src)));
-        Assert.Contains(expectedMsgPart, ex.Message);
-    }
-
-    private static void CheckOk(string src)
-    {
-        var checker = new SemanticChecker();
-        checker.Check(BuildAst(src)); // must not throw
     }
 
     [Fact]
@@ -85,5 +63,28 @@ public class SemanticCheckerTests
             fn main(){ g(1); }
         ",
             "expects 2 args, got 1");
+    }
+
+    private static ProgramHir BuildAst(string src)
+    {
+        ICharStream? input = CharStreams.fromString(src);
+        var lexer = new MiniLangLexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new MiniLangParser(tokens);
+        ProgramHir ast = new HirBuilder().Build(parser.program());
+        return ast;
+    }
+
+    private static void CheckFails(string src, string expectedMsgPart)
+    {
+        var checker = new SemanticChecker();
+        var ex = Assert.Throws<SemanticException>(() => checker.Check(BuildAst(src)));
+        Assert.Contains(expectedMsgPart, ex.Message);
+    }
+
+    private static void CheckOk(string src)
+    {
+        var checker = new SemanticChecker();
+        checker.Check(BuildAst(src)); // must not throw
     }
 }

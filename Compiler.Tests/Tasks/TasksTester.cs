@@ -34,7 +34,7 @@ public sealed class ExampleProgramsTests
     [Fact]
     public void Sieve_FilePipeline_OK_and_PrimeCountCorrect()
     {
-        string src = Load("prime_number_generation.minl.minl");
+        string src = Load("prime_number_generation.minl");
 
         (_, string stdout) = Utils.Run(src);
         Assert.Equal("9592", stdout.Trim());

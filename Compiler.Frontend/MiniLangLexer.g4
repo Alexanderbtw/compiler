@@ -1,7 +1,4 @@
-﻿// ────────────────────────────────────────────────────────────────────────────────
-// MiniLangLexer.g4 – just enough C#-targeted rules for your three benchmarks
-// ────────────────────────────────────────────────────────────────────────────────
-lexer grammar MiniLangLexer;
+﻿lexer grammar MiniLangLexer;
 
 // ────────────────
 // 1.  Channels & basic options

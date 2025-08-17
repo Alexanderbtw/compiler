@@ -1,6 +1,3 @@
-// ────────────────────────────────────────────────────────────────────────────────
-// MiniLangParser.g4  –  minimal syntax for the factorial / sort / sieve language
-// ────────────────────────────────────────────────────────────────────────────────
 parser grammar MiniLangParser;
 
 options { tokenVocab = MiniLangLexer; language = CSharp; }
