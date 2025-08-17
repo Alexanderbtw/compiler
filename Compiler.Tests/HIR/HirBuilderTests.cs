@@ -7,12 +7,12 @@ using Compiler.Translation.HIR.Statements.Abstractions;
 
 namespace Compiler.Tests.Hir;
 
-public class AstBuilderTests
+public class HirBuilderTests
 {
     [Fact]
     public void CharLiteralNodePresent()
     {
-        ProgramHir hir = AstAssert.Ast("fn main(){ var c = 'A'; }");
+        ProgramHir hir = HirAssert.Hir("fn main(){ var c = 'A'; }");
         LetHir let = hir.Functions[0].Body
             .Statements.OfType<LetHir>()
             .First();
@@ -24,20 +24,20 @@ public class AstBuilderTests
     [Fact]
     public void EmptyProgram()
     {
-        ProgramHir hir = AstAssert.Ast("fn main() {}");
+        ProgramHir hir = HirAssert.Hir("fn main() {}");
         Assert.Single(hir.Functions);
         Assert.Equal("main", hir.Functions[0].Name);
     }
 
     [Fact]
-    public void FactorialAst_OK()
+    public void FactorialHir_OK()
     {
         var src = @"
             fn fact(n) {
                 if (n <= 1) return 1;
                 return n * fact(n - 1);
             }";
-        ProgramHir hir = AstAssert.Ast(src);
+        ProgramHir hir = HirAssert.Hir(src);
         FuncHir fact = hir.Functions.Single(f => f.Name == "fact");
 
         // body is a Block with two statements
@@ -54,7 +54,7 @@ public class AstBuilderTests
                     continue;
                 }
             }";
-        ProgramHir hir = AstAssert.Ast(src);
+        ProgramHir hir = HirAssert.Hir(src);
         var body = hir.Functions[0].Body;
 
         // for -> { init; while (cond) { body; iter... } }
@@ -82,7 +82,7 @@ public class AstBuilderTests
             var v = get(arr, 0);
         }";
 
-        ProgramHir hir = AstAssert.Ast(src);
+        ProgramHir hir = HirAssert.Hir(src);
 
         List<ExprHir> exprs = hir.Functions
             .SelectMany(f => FlattenStmts(f.Body))

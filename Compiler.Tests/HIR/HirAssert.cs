@@ -6,9 +6,9 @@ using Compiler.Translation.HIR.Common;
 
 namespace Compiler.Tests.HIR;
 
-internal static class AstAssert
+internal static class HirAssert
 {
-    internal static ProgramHir Ast(string src)
+    internal static ProgramHir Hir(string src)
     {
         var input = new AntlrInputStream(src);
         var lexer = new MiniLangLexer(input);

@@ -65,26 +65,26 @@ public class SemanticCheckerTests
             "expects 2 args, got 1");
     }
 
-    private static ProgramHir BuildAst(string src)
+    private static ProgramHir BuildHir(string src)
     {
         ICharStream? input = CharStreams.fromString(src);
         var lexer = new MiniLangLexer(input);
         var tokens = new CommonTokenStream(lexer);
         var parser = new MiniLangParser(tokens);
-        ProgramHir ast = new HirBuilder().Build(parser.program());
-        return ast;
+        ProgramHir hir = new HirBuilder().Build(parser.program());
+        return hir;
     }
 
     private static void CheckFails(string src, string expectedMsgPart)
     {
         var checker = new SemanticChecker();
-        var ex = Assert.Throws<SemanticException>(() => checker.Check(BuildAst(src)));
+        var ex = Assert.Throws<SemanticException>(() => checker.Check(BuildHir(src)));
         Assert.Contains(expectedMsgPart, ex.Message);
     }
 
     private static void CheckOk(string src)
     {
         var checker = new SemanticChecker();
-        checker.Check(BuildAst(src)); // must not throw
+        checker.Check(BuildHir(src)); // must not throw
     }
 }

@@ -13,8 +13,8 @@ internal static class Utils
 {
     public static (object? value, string stdout) Run(string src, bool time = false)
     {
-        ProgramHir ast = BuildAst(src);
-        var interp = new Interpreter.Interpreter(ast);
+        ProgramHir hir = BuildHir(src);
+        var interp = new Interpreter.Interpreter(hir);
 
         var sb = new StringBuilder();
         using var writer = new StringWriter(sb);
@@ -25,13 +25,13 @@ internal static class Utils
 
         return (ret, sb.ToString().TrimEnd());
     }
-    private static ProgramHir BuildAst(string src)
+    private static ProgramHir BuildHir(string src)
     {
         MiniLangParser parser = CreateParser(src);
         MiniLangParser.ProgramContext? tree = parser.program();
-        ProgramHir ast = new HirBuilder().Build(tree);
-        new SemanticChecker().Check(ast);
-        return ast;
+        ProgramHir hir = new HirBuilder().Build(tree);
+        new SemanticChecker().Check(hir);
+        return hir;
     }
     private static MiniLangParser CreateParser(string src)
     {

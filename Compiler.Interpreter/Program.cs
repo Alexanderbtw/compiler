@@ -40,7 +40,7 @@ public class Program
 
         MiniLangParser.ProgramContext tree = parser.program();
         var builder = new HirBuilder();
-        ProgramHir ast = builder.Build(tree);
+        ProgramHir hir = builder.Build(tree);
 
         if (listenerLexer.HadError || listenerParser.HadError)
         {
@@ -55,9 +55,9 @@ public class Program
         Console.ResetColor();
 
         var semanticChecker = new SemanticChecker();
-        semanticChecker.Check(ast);
+        semanticChecker.Check(hir);
 
-        var interpreter = new Interpreter(ast);
+        var interpreter = new Interpreter(hir);
         object? obj = interpreter.Run();
         Console.WriteLine(obj);
     }
