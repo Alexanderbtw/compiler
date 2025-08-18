@@ -38,7 +38,7 @@ public sealed class CilBackend
     private (Assembly asm, Type programType) Emit(MirModule mod, string asmName = "MiniLangDyn")
     {
         var an = new AssemblyName(asmName);
-        AssemblyBuilder ab = AssemblyBuilder.DefineDynamicAssembly(an, AssemblyBuilderAccess.Run);
+        AssemblyBuilder ab = AssemblyBuilder.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndCollect);
         ModuleBuilder mb = ab.DefineDynamicModule(asmName);
         TypeBuilder tb = mb.DefineType(
             "MiniProgram",
