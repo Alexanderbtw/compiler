@@ -1,9 +1,15 @@
 [Documentation](docs.md)
 
+# What we have:
+- ANTLR-4 syntax parse tree -> HIR
+- *HIR may be run on interpreter*
+- HIR -> MIR
+- MIR -> CIL
+- *CIL may be run on CLR*
+
 # TOOD:
-- Translate AST -> MIR (mini IR)
-- Translate MIR -> CIL and run on CLR
 - Translate MIR -> SSA and run on LLVM
+- Optimizations
 - Write own backend (?)
 
 ## Goal:
