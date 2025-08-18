@@ -8,7 +8,8 @@
 - *CIL may be run on CLR*
 
 # TOOD:
-- Translate MIR -> SSA and run on LLVM
+- Translate MIR -> SSA
+- Run on LLVM
 - Optimizations
 - Write own backend (?)
 
