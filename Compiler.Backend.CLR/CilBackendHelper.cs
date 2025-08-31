@@ -23,7 +23,7 @@ public sealed partial class CilBackend
             opcode: OpCodes.Newarr,
             cls: typeof(object));
 
-        for (var i = 0; i < args.Count; i++)
+        for (int i = 0; i < args.Count; i++)
         {
             ilgen.Emit(OpCodes.Dup);
             ilgen.Emit(

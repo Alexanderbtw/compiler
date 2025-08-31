@@ -38,7 +38,7 @@ public class HirBuilderTests
     [Fact]
     public void FactorialHir_OK()
     {
-        var src = @"
+        string src = @"
             fn fact(n) {
                 if (n <= 1) return 1;
                 return n * fact(n - 1);
@@ -54,7 +54,7 @@ public class HirBuilderTests
     [Fact]
     public void ForLoop_ExpressionLists_AreDesugaredToWhile()
     {
-        var src = @"
+        string src = @"
             fn main() {
                 var i = 0;
                 var j = 10;
@@ -101,7 +101,7 @@ public class HirBuilderTests
     [Fact]
     public void IndexAndCall()
     {
-        var src = @"
+        string src = @"
         fn get(a, i) { return a[i]; }
         fn main() {
             var arr = array(3);

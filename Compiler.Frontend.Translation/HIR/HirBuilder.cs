@@ -453,7 +453,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
     {
         var e = (ExprHir)Visit(terms[0]);
 
-        for (var i = 0; i < ops.Count; i++)
+        for (int i = 0; i < ops.Count; i++)
         {
             BinOp op = BinMap[ops[i]
                 .GetText()];

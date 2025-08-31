@@ -30,7 +30,7 @@ public sealed class MirTypeAnnotator
         }
 
         bool changed;
-        var guard = 0;
+        int guard = 0;
 
         do
         {

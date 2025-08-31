@@ -39,7 +39,7 @@ public static class BuiltinsRuntime
         }
 
         n = checked((int)n64);
-        var a = new object?[n];
+        object?[] a = new object?[n];
 
         if (args.Length == 2)
         {

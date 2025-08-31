@@ -28,7 +28,7 @@ public static class BuiltinsVm
             throw new InvalidOperationException("array(n) expects 1 arg");
         }
 
-        var n = checked((int)args[0]
+        int n = checked((int)args[0]
             .AsLong());
 
         return Value.FromArray(new VmArray(n));

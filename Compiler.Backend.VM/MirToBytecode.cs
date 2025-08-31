@@ -21,7 +21,7 @@ public sealed class MirToBytecode
                     arity: f.ParamRegs.Count));
         }
 
-        for (var i = 0; i < m.Functions.Count; i++)
+        for (int i = 0; i < m.Functions.Count; i++)
         {
             LowerFunction(
                 f: m.Functions[i],
@@ -136,7 +136,7 @@ public sealed class MirToBytecode
         }
 
         // Пройти блоки в порядке объявления
-        for (var bIdx = 0; bIdx < f.Blocks.Count; bIdx++)
+        for (int bIdx = 0; bIdx < f.Blocks.Count; bIdx++)
         {
             MirBlock b = f.Blocks[bIdx];
             bool isLastBlock = bIdx == f.Blocks.Count - 1;

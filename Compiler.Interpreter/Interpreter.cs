@@ -158,7 +158,7 @@ public class Interpreter
 
         var frame = new Frame();
 
-        for (var i = 0; i < args.Length; i++)
+        for (int i = 0; i < args.Length; i++)
         {
             frame.Locals[f.Parameters[i]] = args[i];
         }

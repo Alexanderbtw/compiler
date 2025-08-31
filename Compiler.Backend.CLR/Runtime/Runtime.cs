@@ -57,7 +57,7 @@ public static class Runtime
             throw new InvalidOperationException("indexing a non-array value");
         }
 
-        var i = checked((int)L(idx));
+        int i = checked((int)L(idx));
 
         if ((uint)i >= (uint)a.Length)
         {
@@ -126,7 +126,7 @@ public static class Runtime
             throw new InvalidOperationException("indexing a non-array value");
         }
 
-        var i = checked((int)L(idx));
+        int i = checked((int)L(idx));
 
         if ((uint)i >= (uint)a.Length)
         {

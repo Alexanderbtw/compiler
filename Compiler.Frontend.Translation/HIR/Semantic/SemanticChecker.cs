@@ -90,7 +90,7 @@ public sealed class SemanticChecker
             return; // not a builtin — should not happen if Exists returned true
         }
 
-        var ok = false;
+        bool ok = false;
 
         foreach (BuiltinDescriptor d in cands)
         {

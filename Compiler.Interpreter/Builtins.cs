@@ -223,9 +223,9 @@ public static class Builtins
                         throw new RuntimeException("array length must be non-negative");
                     }
 
-                    var arr = new object?[n];
+                    object?[] arr = new object?[n];
 
-                    for (var i = 0; i < n; i++)
+                    for (int i = 0; i < n; i++)
                     {
                         arr[i] = args[1];
                     }

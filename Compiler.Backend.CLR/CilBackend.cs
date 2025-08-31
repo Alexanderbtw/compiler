@@ -110,7 +110,7 @@ public sealed partial class CilBackend
             }
 
             // ==== Prologue: bind args[] to parameters (deterministic) ====
-            for (var i = 0; i < f.ParamRegs.Count; i++)
+            for (int i = 0; i < f.ParamRegs.Count; i++)
             {
                 il.Emit(OpCodes.Ldarg_0); // args
                 il.Emit(

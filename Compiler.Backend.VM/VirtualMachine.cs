@@ -186,7 +186,7 @@ public sealed class VirtualMachine(
                 // arrays
                 case OpCode.LdElem:
                     {
-                        var idx = (int)Pop()
+                        int idx = (int)Pop()
                             .AsLong();
 
                         VmArray arr = Pop()
@@ -199,7 +199,7 @@ public sealed class VirtualMachine(
                 case OpCode.StElem:
                     {
                         Value val = Pop();
-                        var idx = (int)Pop()
+                        int idx = (int)Pop()
                             .AsLong();
 
                         VmArray arr = Pop()
@@ -350,7 +350,7 @@ public sealed class VirtualMachine(
         var frame = new Frame { Fn = fn, Locals = new Value[fn.NLocals], Pc = 0 };
 
         // разместить параметры в их локальных слотах
-        for (var i = 0; i < fn.Arity; i++)
+        for (int i = 0; i < fn.Arity; i++)
         {
             frame.Locals[fn.ParamLocalIndices[i]] = args[i];
         }

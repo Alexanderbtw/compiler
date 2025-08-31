@@ -142,7 +142,7 @@ internal static class TestUtils
                         expected: earr.Length,
                         actual: arr.Length);
 
-                    for (var i = 0; i < earr.Length; i++)
+                    for (int i = 0; i < earr.Length; i++)
                     {
                         switch (earr[i])
                         {
