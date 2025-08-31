@@ -1,6 +1,4 @@
-using Compiler.Tests.Interpretation;
-
-namespace Compiler.Tests.Tasks;
+namespace Compiler.Tests.Interpretation;
 
 public sealed class ExampleProgramsTests
 {
