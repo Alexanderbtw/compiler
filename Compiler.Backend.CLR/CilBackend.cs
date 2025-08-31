@@ -2,14 +2,15 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 using Compiler.Backend.CLR.Runtime;
-using Compiler.Translation.MIR.Common;
-using Compiler.Translation.MIR.Instructions;
-using Compiler.Translation.MIR.Instructions.Abstractions;
-using Compiler.Translation.MIR.Operands;
+using Compiler.Frontend.Translation.MIR;
+using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Frontend.Translation.MIR.Instructions;
+using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
+using Compiler.Frontend.Translation.MIR.Operands;
 
 namespace Compiler.Backend.CLR;
 
-public sealed class CilBackend
+public sealed partial class CilBackend
 {
     private readonly Dictionary<string, MethodInfo> _rt = new()
     {
@@ -35,6 +36,14 @@ public sealed class CilBackend
     private readonly static MethodInfo BuiltinsInvoke =
         typeof(BuiltinsRuntime).GetMethod(nameof(BuiltinsRuntime.Invoke))!;
 
+    public object? RunMain(MirModule mod)
+    {
+        (Assembly asm, Type type) = Emit(mod);
+        MethodInfo main = type.GetMethod("main", BindingFlags.Public | BindingFlags.Static)
+                          ?? throw new MissingMethodException("entry function 'main' not found");
+        return main.Invoke(null, [Array.Empty<object?>()]);
+    }
+
     private (Assembly asm, Type programType) Emit(MirModule mod, string asmName = "MiniLangDyn")
     {
         var an = new AssemblyName(asmName);
@@ -43,6 +52,9 @@ public sealed class CilBackend
         TypeBuilder tb = mb.DefineType(
             "MiniProgram",
             TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
+
+        // MIR simplification: const-folding + copy-prop + branch folding
+        new MirSimplifier().Run(mod);
 
         // Собираем список имён функций (для вызовов user→user)
         var funcNames = new HashSet<string>(mod.Functions.Select(f => f.Name));
@@ -61,22 +73,28 @@ public sealed class CilBackend
 
             ILGenerator il = mbuilder.GetILGenerator();
 
+            // Инференция типов для функции
+            new MirTypeAnnotator().Annotate(f);
+
             // vreg → local(object)
             var locals = new Dictionary<int, LocalBuilder>();
 
             LocalBuilder GetLocal(VReg v)
             {
                 if (!locals.TryGetValue(v.Id, out LocalBuilder? lb))
-                    locals[v.Id] = lb = il.DeclareLocal(typeof(object));
+                {
+                    Type t = GetClrTypeForVReg(f, v);
+                    locals[v.Id] = lb = il.DeclareLocal(t);
+                }
                 return lb;
             }
 
             // ==== Prologue: bind args[] to parameters (deterministic) ====
-            for (int i = 0; i < f.ParamRegs.Count; i++)
+            for (var i = 0; i < f.ParamRegs.Count; i++)
             {
-                il.Emit(OpCodes.Ldarg_0);           // args
-                il.Emit(OpCodes.Ldc_I4, i);         // index
-                il.Emit(OpCodes.Ldelem_Ref);        // args[i]
+                il.Emit(OpCodes.Ldarg_0); // args
+                il.Emit(OpCodes.Ldc_I4, i); // index
+                il.Emit(OpCodes.Ldelem_Ref); // args[i]
                 il.Emit(OpCodes.Stloc, GetLocal(f.ParamRegs[i]));
             }
 
@@ -90,7 +108,7 @@ public sealed class CilBackend
 
                 // инструкции
                 foreach (MirInstr ins in b.Instructions)
-                    EmitInstr(il, ins, GetLocal, methods, funcNames);
+                    EmitInstr(il, f, ins, GetLocal, methods, funcNames);
 
                 // терминатор
                 switch (b.Terminator)
@@ -99,18 +117,41 @@ public sealed class CilBackend
                         break;
                     case Ret r:
                         if (r.Value is null)
+                        {
                             il.Emit(OpCodes.Ldnull);
+                        }
+                        else if (r.Value is VReg rv)
+                        {
+                            il.Emit(OpCodes.Ldloc, GetLocal(rv));
+                            Type rt = GetClrTypeForOperand(f, rv);
+                            if (rt == typeof(long)) il.Emit(OpCodes.Box, typeof(long));
+                            else if (rt == typeof(bool)) il.Emit(OpCodes.Box, typeof(bool));
+                            else if (rt == typeof(char)) il.Emit(OpCodes.Box, typeof(char));
+                        }
+                        else if (r.Value is Const rc)
+                        {
+                            EmitConst(il, rc.Value); // already boxed
+                        }
                         else
+                        {
+                            // generic operand (shouldn't happen often)
                             EmitOperand(il, r.Value, GetLocal);
+                        }
                         il.Emit(OpCodes.Ret);
                         break;
                     case Br br:
                         il.Emit(OpCodes.Br, labels[br.Target]);
                         break;
                     case BrCond bc:
-                        // cond → bool → brtrue
-                        EmitOperand(il, bc.Cond, GetLocal);
-                        il.Emit(OpCodes.Call, _rt["ToBool"]);
+                        if (bc.Cond is VReg cv && GetClrTypeForOperand(f, cv) == typeof(bool))
+                        {
+                            il.Emit(OpCodes.Ldloc, GetLocal(cv));
+                        }
+                        else
+                        {
+                            EmitLoadAsObject(il, f, bc.Cond, GetLocal);
+                            il.Emit(OpCodes.Call, _rt["ToBool"]);
+                        }
                         il.Emit(OpCodes.Brtrue, labels[bc.IfTrue]);
                         il.Emit(OpCodes.Br, labels[bc.IfFalse]);
                         break;
@@ -128,57 +169,11 @@ public sealed class CilBackend
         return (ab, programType);
     }
 
-    public object? RunMain(MirModule mod)
-    {
-        (Assembly asm, Type type) = Emit(mod);
-        MethodInfo main = type.GetMethod("main", BindingFlags.Public | BindingFlags.Static)
-                          ?? throw new MissingMethodException("entry function 'main' not found");
-        return main.Invoke(null, [Array.Empty<object?>()]);
-    }
-
-    private void EmitArgsArray(
-        ILGenerator il,
-        IReadOnlyList<MOperand> args,
-        Func<VReg, LocalBuilder> getLocal)
-    {
-        il.Emit(OpCodes.Ldc_I4, args.Count);
-        il.Emit(OpCodes.Newarr, typeof(object));
-        for (var i = 0; i < args.Count; i++)
-        {
-            il.Emit(OpCodes.Dup);
-            il.Emit(OpCodes.Ldc_I4, i);
-            EmitOperand(il, args[i], getLocal);
-            il.Emit(OpCodes.Stelem_Ref);
-        }
-    }
-
-    private static void EmitConst(ILGenerator il, object? val)
-    {
-        switch (val)
-        {
-            case null: il.Emit(OpCodes.Ldnull); break;
-            case string s: il.Emit(OpCodes.Ldstr, s); break;
-            case long n:
-                il.Emit(OpCodes.Ldc_I8, n);
-                il.Emit(OpCodes.Box, typeof(long));
-                break;
-            case bool b:
-                il.Emit(b ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-                il.Emit(OpCodes.Box, typeof(bool));
-                break;
-            case char ch:
-                il.Emit(OpCodes.Ldc_I4, ch);
-                il.Emit(OpCodes.Box, typeof(char));
-                break;
-            default:
-                throw new NotSupportedException($"Const {val.GetType().Name}");
-        }
-    }
-
     // Emission helpers
 
     private void EmitInstr(
         ILGenerator il,
+        MirFunction f,
         MirInstr ins,
         Func<VReg, LocalBuilder> getLocal,
         Dictionary<string, MethodBuilder> methods,
@@ -187,114 +182,25 @@ public sealed class CilBackend
         switch (ins)
         {
             case Move mv:
-            {
-                EmitOperand(il, mv.Src, getLocal);
-                il.Emit(OpCodes.Stloc, getLocal(mv.Dst));
+                EmitMove(il, f, mv, getLocal);
                 break;
-            }
             case Bin bi:
-            {
-                EmitOperand(il, bi.L, getLocal);
-                EmitOperand(il, bi.R, getLocal);
-                il.Emit(OpCodes.Call, MapBin(bi.Op));
-                il.Emit(OpCodes.Stloc, getLocal(bi.Dst));
+                EmitBin(il, f, bi, getLocal);
                 break;
-            }
             case Un un:
-            {
-                EmitOperand(il, un.X, getLocal);
-                il.Emit(OpCodes.Call, MapUn(un.Op));
-                il.Emit(OpCodes.Stloc, getLocal(un.Dst));
+                EmitUn(il, f, un, getLocal);
                 break;
-            }
             case LoadIndex li:
-            {
-                EmitOperand(il, li.Arr, getLocal);
-                EmitOperand(il, li.Index, getLocal);
-                il.Emit(OpCodes.Call, _rt["LoadIndex"]);
-                il.Emit(OpCodes.Stloc, getLocal(li.Dst));
+                EmitLoadIndex(il, f, li, getLocal);
                 break;
-            }
             case StoreIndex si:
-            {
-                EmitOperand(il, si.Arr, getLocal);
-                EmitOperand(il, si.Index, getLocal);
-                EmitOperand(il, si.Value, getLocal);
-                il.Emit(OpCodes.Call, _rt["StoreIndex"]);
+                EmitStoreIndex(il, f, si, getLocal);
                 break;
-            }
             case Call cl:
-            {
-                // собираем object?[] args и временно сохраняем в локальную переменную
-                EmitArgsArray(il, cl.Args, getLocal);
-                LocalBuilder tmpArgs = il.DeclareLocal(typeof(object[]));
-                il.Emit(OpCodes.Stloc, tmpArgs);
-
-                if (funcNames.Contains(cl.Callee))
-                {
-                    // user function: call f(args)
-                    MethodBuilder mi = methods[cl.Callee];
-                    il.Emit(OpCodes.Ldloc, tmpArgs);
-                    il.Emit(OpCodes.Call, mi);
-                }
-                else
-                {
-                    // builtin: BuiltinsRuntime.Invoke(name, args)
-                    il.Emit(OpCodes.Ldstr, cl.Callee); // 1st arg
-                    il.Emit(OpCodes.Ldloc, tmpArgs); // 2nd arg
-                    il.Emit(OpCodes.Call, BuiltinsInvoke);
-                }
-
-                if (cl.Dst is not null)
-                    il.Emit(OpCodes.Stloc, getLocal(cl.Dst));
-                else
-                    il.Emit(OpCodes.Pop);
+                EmitCall(il, f, cl, getLocal, methods, funcNames);
                 break;
-            }
             default:
                 throw new NotSupportedException($"Instr {ins.GetType().Name}");
         }
     }
-
-    private void EmitOperand(ILGenerator il, MOperand? op, Func<VReg, LocalBuilder> getLocal)
-    {
-        switch (op)
-        {
-            case null:
-                il.Emit(OpCodes.Ldnull);
-                return;
-            case VReg v:
-                il.Emit(OpCodes.Ldloc, getLocal(v));
-                return;
-            case Const c:
-                EmitConst(il, c.Value);
-                return;
-            default:
-                throw new NotSupportedException($"Operand {op.GetType().Name}");
-        }
-    }
-
-    private MethodInfo MapBin(MBinOp op) => op switch
-    {
-        MBinOp.Add => _rt["Add"],
-        MBinOp.Sub => _rt["Sub"],
-        MBinOp.Mul => _rt["Mul"],
-        MBinOp.Div => _rt["Div"],
-        MBinOp.Mod => _rt["Mod"],
-        MBinOp.Lt => _rt["Lt"],
-        MBinOp.Le => _rt["Le"],
-        MBinOp.Gt => _rt["Gt"],
-        MBinOp.Ge => _rt["Ge"],
-        MBinOp.Eq => _rt["Eq"],
-        MBinOp.Ne => _rt["Ne"],
-        _ => throw new NotSupportedException(op.ToString())
-    };
-
-    private MethodInfo MapUn(MUnOp op) => op switch
-    {
-        MUnOp.Neg => _rt["Neg"],
-        MUnOp.Not => _rt["Not"],
-        MUnOp.Plus => _rt["Plus"],
-        _ => throw new NotSupportedException(op.ToString())
-    };
 }

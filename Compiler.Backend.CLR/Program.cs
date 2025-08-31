@@ -1,11 +1,11 @@
 ﻿using Antlr4.Runtime;
 
 using Compiler.Frontend;
-using Compiler.Translation.HIR;
-using Compiler.Translation.HIR.Common;
-using Compiler.Translation.HIR.Semantic;
-using Compiler.Translation.MIR;
-using Compiler.Translation.MIR.Common;
+using Compiler.Frontend.Translation.HIR;
+using Compiler.Frontend.Translation.HIR.Common;
+using Compiler.Frontend.Translation.HIR.Semantic;
+using Compiler.Frontend.Translation.MIR;
+using Compiler.Frontend.Translation.MIR.Common;
 
 namespace Compiler.Backend.CLR;
 

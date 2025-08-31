@@ -5,12 +5,12 @@ using System.Linq;
 
 using Compiler.Interpreter.Exceptions;
 using Compiler.Interpreter.Signals;
-using Compiler.Translation.HIR.Common;
-using Compiler.Translation.HIR.Expressions;
-using Compiler.Translation.HIR.Expressions.Abstractions;
-using Compiler.Translation.HIR.Semantic.Exceptions;
-using Compiler.Translation.HIR.Statements;
-using Compiler.Translation.HIR.Statements.Abstractions;
+using Compiler.Frontend.Translation.HIR.Common;
+using Compiler.Frontend.Translation.HIR.Expressions;
+using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
+using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
+using Compiler.Frontend.Translation.HIR.Statements;
+using Compiler.Frontend.Translation.HIR.Statements.Abstractions;
 
 namespace Compiler.Interpreter;
 

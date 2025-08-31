@@ -1,7 +1,7 @@
-using Compiler.Translation.MIR;
-using Compiler.Translation.MIR.Common;
-using Compiler.Translation.MIR.Instructions;
-using Compiler.Translation.MIR.Instructions.Abstractions;
+using Compiler.Frontend.Translation.MIR;
+using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Frontend.Translation.MIR.Instructions;
+using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 
 namespace Compiler.Tests.MIR;
 

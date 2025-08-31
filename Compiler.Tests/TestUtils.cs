@@ -4,18 +4,19 @@ using System.Text;
 using Antlr4.Runtime;
 
 using Compiler.Backend.CLR;
+using Compiler.Backend.VM;
 using Compiler.Frontend;
-using Compiler.Translation.HIR;
-using Compiler.Translation.HIR.Common;
-using Compiler.Translation.HIR.Expressions;
-using Compiler.Translation.HIR.Expressions.Abstractions;
-using Compiler.Translation.HIR.Semantic;
-using Compiler.Translation.HIR.Semantic.Exceptions;
-using Compiler.Translation.HIR.Statements;
-using Compiler.Translation.HIR.Statements.Abstractions;
-using Compiler.Translation.MIR;
-using Compiler.Translation.MIR.Common;
-using Compiler.Translation.MIR.Instructions.Abstractions;
+using Compiler.Frontend.Translation.HIR;
+using Compiler.Frontend.Translation.HIR.Common;
+using Compiler.Frontend.Translation.HIR.Expressions;
+using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
+using Compiler.Frontend.Translation.HIR.Semantic;
+using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
+using Compiler.Frontend.Translation.HIR.Statements;
+using Compiler.Frontend.Translation.HIR.Statements.Abstractions;
+using Compiler.Frontend.Translation.MIR;
+using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 
 using Xunit.Sdk;
 
@@ -23,52 +24,54 @@ namespace Compiler.Tests;
 
 internal static class TestUtils
 {
-    public readonly static string[] SourceExtensions = { ".minl" };
+    public readonly static string[] SourceExtensions = [".minl"];
 
     // --- Константы/настройки ---
     // в TestUtils.cs (или где объявлен список дефолтных директорий)
-    private static readonly string[] DefaultProgramDirs =
-    {
-        Path.Combine(AppContext.BaseDirectory, "Tasks"),
-    };
+    private readonly static string[] DefaultProgramDirs =
+    [
+        Path.Combine(AppContext.BaseDirectory, "Tasks")
+    ];
 
     public static void AssertReturnEqual(object expected, object? actual)
     {
+        actual   = TryUnwrapVmValue(actual);
+
         switch (expected)
         {
             case long el:
-                Assert.IsType<long>(actual);
+                Assert.True(actual is long, $"Expected long but got {actual?.GetType().Name ?? "null"}");
                 Assert.Equal(el, (long)actual!);
                 break;
 
             case bool eb:
-                Assert.IsType<bool>(actual);
+                Assert.True(actual is bool, $"Expected bool but got {actual?.GetType().Name ?? "null"}");
                 Assert.Equal(eb, (bool)actual!);
                 break;
 
             case string es:
-                Assert.IsType<string>(actual);
+                Assert.True(actual is string, $"Expected string but got {actual?.GetType().Name ?? "null"}");
                 Assert.Equal(es, (string)actual!);
                 break;
 
             case object?[] earr:
             {
-                object?[] arr = Assert.IsType<object?[]>(actual);
+                object?[] arr = Assert.IsAssignableFrom<object?[]>(actual ?? Array.Empty<object>());
                 Assert.Equal(earr.Length, arr.Length);
                 for (var i = 0; i < earr.Length; i++)
                 {
                     switch (earr[i])
                     {
                         case long ln:
-                            Assert.IsType<long>(arr[i]);
+                            Assert.True(arr[i] is long, $"Expected {nameof(Int64)} but got {arr[i]?.GetType().Name ?? "null"}");
                             Assert.Equal(ln, (long)arr[i]!);
                             break;
                         case string ls:
-                            Assert.IsType<string>(arr[i]);
+                            Assert.True(arr[i] is string, $"Expected {nameof(String)} but got {arr[i]?.GetType().Name ?? "null"}");
                             Assert.Equal(ls, (string)arr[i]!);
                             break;
                         case bool lb:
-                            Assert.IsType<bool>(arr[i]);
+                            Assert.True(arr[i] is bool, $"Expected {nameof(Boolean)} but got {arr[i]?.GetType().Name ?? "null"}");
                             Assert.Equal(lb, (bool)arr[i]!);
                             break;
                         default:
@@ -99,6 +102,12 @@ internal static class TestUtils
     {
         ProgramHir hir = BuildHir(src);
         return new HirToMir().Lower(hir);
+    }
+
+    public static VmModule BuildBytecode(string src)
+    {
+        MirModule mir = BuildMir(src);
+        return new MirToBytecode().Lower(mir);
     }
 
     // --- Поиск программ для [Theory] ---
@@ -189,6 +198,22 @@ internal static class TestUtils
         try
         {
             object? ret = backend.RunMain(mir);
+            return (ret, sb.ToString().TrimEnd());
+        }
+        finally { Console.SetOut(old); }
+    }
+
+    public static (object? ret, string stdout) RunVm(string src)
+    {
+        VmModule bytecode = BuildBytecode(src);
+        var virtualMachine = new VirtualMachine(bytecode);
+
+        var sb = new StringBuilder();
+        TextWriter old = Console.Out;
+        Console.SetOut(new StringWriter(sb));
+        try
+        {
+            Value ret = virtualMachine.Execute();
             return (ret, sb.ToString().TrimEnd());
         }
         finally { Console.SetOut(old); }
@@ -295,13 +320,33 @@ internal static class TestUtils
     public static IEnumerable<ExprHir> FlattenStmts(StmtHir s) => s switch
     {
         BlockHir b   => b.Statements.SelectMany(FlattenStmts),
-        LetHir v     => v.Init is null ? Enumerable.Empty<ExprHir>() : FlattenExpr(v.Init),
-        ExprStmtHir e=> e.Expr is null ? Enumerable.Empty<ExprHir>() : FlattenExpr(e.Expr),
+        LetHir v     => v.Init is null ? [] : FlattenExpr(v.Init),
+        ExprStmtHir e=> e.Expr is null ? [] : FlattenExpr(e.Expr),
         IfHir i      => FlattenExpr(i.Cond).Concat(FlattenStmts(i.Then))
-            .Concat(i.Else is not null ? FlattenStmts(i.Else) : Enumerable.Empty<ExprHir>()),
+            .Concat(i.Else is not null ? FlattenStmts(i.Else) : []),
         WhileHir w   => FlattenExpr(w.Cond).Concat(FlattenStmts(w.Body)),
-        _            => Enumerable.Empty<ExprHir>()
+        _            => []
     };
+
+    private static object? TryUnwrapVmValue(object? v)
+    {
+        return v switch
+        {
+            null => null,
+            Value value => value.Tag switch
+            {
+                ValueTag.Null => null,
+                ValueTag.I64 => value.AsLong(),
+                ValueTag.Bool => value.AsBool(),
+                ValueTag.Char => value.AsChar(),
+                ValueTag.String => value.AsStr(),
+                ValueTag.Array => value.AsArr(),
+                ValueTag.Object => value,
+                _ => throw new ArgumentOutOfRangeException()
+            },
+            _ => v
+        };
+    }
 
     public static void AssertSemanticOk(string src)
     {

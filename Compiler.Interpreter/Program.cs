@@ -4,9 +4,9 @@ using System.IO;
 using Antlr4.Runtime;
 
 using Compiler.Frontend;
-using Compiler.Translation.HIR;
-using Compiler.Translation.HIR.Common;
-using Compiler.Translation.HIR.Semantic;
+using Compiler.Frontend.Translation.HIR;
+using Compiler.Frontend.Translation.HIR.Common;
+using Compiler.Frontend.Translation.HIR.Semantic;
 
 namespace Compiler.Interpreter;
 

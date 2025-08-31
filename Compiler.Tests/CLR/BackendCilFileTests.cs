@@ -10,4 +10,14 @@ public class BackendCilFileTests(ITestOutputHelper testOutputHelper)
         path,
         TestUtils.RunCil,
         testOutputHelper);
+
+    [Theory]
+    [ProgramFilesData]
+    public void Cil_vs_Interp_All_Files(string path)
+    {
+        string src = File.ReadAllText(path);
+        (object? retExpected, string outExpected) = TestUtils.RunInterpreter(src);
+        (object? retActual, string outActual) = TestUtils.RunCil(src);
+        TestUtils.AssertProgramResult(retExpected, outExpected, retActual, outActual, testOutputHelper);
+    }
 }
