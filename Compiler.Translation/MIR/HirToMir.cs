@@ -108,7 +108,8 @@ public sealed class HirToMir
         foreach (var p in f.Parameters)
         {
             var vr = ctx.Def(p);
-            ctx.F.Parameters[p] = vr;
+            ctx.F.ParamNames.Add(p);
+            ctx.F.ParamRegs.Add(vr);
         }
 
         LowerStmt(ctx, f.Body);

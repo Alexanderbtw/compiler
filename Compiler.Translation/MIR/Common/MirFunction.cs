@@ -15,6 +15,10 @@ public sealed class MirFunction
 
     public Dictionary<string, VReg> Parameters { get; } = new();
 
+    public List<string> ParamNames { get; } = new();
+
+    public List<VReg> ParamRegs { get; } = new();
+
     public MirBlock NewBlock(string name)
     {
         var b = new MirBlock(name);

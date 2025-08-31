@@ -47,17 +47,6 @@ public sealed class CilBackend
         // Собираем список имён функций (для вызовов user→user)
         var funcNames = new HashSet<string>(mod.Functions.Select(f => f.Name));
 
-        // Precompute max arity per function from call sites (used to bind args->locals)
-        var arity = new Dictionary<string, int>();
-        foreach (MirFunction fn in mod.Functions)
-        foreach (MirBlock bb in fn.Blocks)
-        foreach (MirInstr ins in bb.Instructions)
-            if (ins is Call c)
-            {
-                if (!arity.TryGetValue(c.Callee, out int prev) || c.Args.Count > prev)
-                    arity[c.Callee] = c.Args.Count;
-            }
-
         // Генерим методы
         var methods = new Dictionary<string, MethodBuilder>();
         foreach (MirFunction f in mod.Functions)
@@ -82,66 +71,13 @@ public sealed class CilBackend
                 return lb;
             }
 
-            // Prologue: bind args[] to parameter VRegs (heuristic)
-            // Heuristic: parameters are the earliest VRegs allocated by the HIR→MIR lowerer
-            // (ctx.Def called for params before any other temps/locals). We infer count from call sites.
-            int paramCount = arity.TryGetValue(f.Name, out int pc) ? pc : 0;
-            if (paramCount > 0)
+            // ==== Prologue: bind args[] to parameters (deterministic) ====
+            for (int i = 0; i < f.ParamRegs.Count; i++)
             {
-                // Collect all VRegs used/defined in this function, keep them ordered by Id
-                var vregById = new SortedDictionary<int, VReg>();
-
-                void CollectOp(MOperand? op)
-                {
-                    if (op is VReg vv) vregById[vv.Id] = vv;
-                }
-
-                foreach (MirBlock bb in f.Blocks)
-                {
-                    foreach (MirInstr ins in bb.Instructions)
-                    {
-                        switch (ins)
-                        {
-                            case Move m:
-                                vregById[m.Dst.Id] = m.Dst;
-                                CollectOp(m.Src);
-                                break;
-                            case Bin b2:
-                                vregById[b2.Dst.Id] = b2.Dst;
-                                CollectOp(b2.L);
-                                CollectOp(b2.R);
-                                break;
-                            case Un u2:
-                                vregById[u2.Dst.Id] = u2.Dst;
-                                CollectOp(u2.X);
-                                break;
-                            case LoadIndex ld:
-                                vregById[ld.Dst.Id] = ld.Dst;
-                                CollectOp(ld.Arr);
-                                CollectOp(ld.Index);
-                                break;
-                            case StoreIndex st:
-                                CollectOp(st.Arr);
-                                CollectOp(st.Index);
-                                CollectOp(st.Value);
-                                break;
-                            case Call c2:
-                                if (c2.Dst is not null) vregById[c2.Dst.Id] = c2.Dst;
-                                foreach (MOperand a in c2.Args) CollectOp(a);
-                                break;
-                        }
-                    }
-                }
-
-                // Take the first N vregs by Id as parameters (matches allocation order in lowerer)
-                VReg[] paramRegs = vregById.Values.Take(paramCount).ToArray();
-                for (var i = 0; i < paramRegs.Length; i++)
-                {
-                    il.Emit(OpCodes.Ldarg_0); // args
-                    il.Emit(OpCodes.Ldc_I4, i); // index
-                    il.Emit(OpCodes.Ldelem_Ref); // args[i]
-                    il.Emit(OpCodes.Stloc, GetLocal(paramRegs[i]));
-                }
+                il.Emit(OpCodes.Ldarg_0);           // args
+                il.Emit(OpCodes.Ldc_I4, i);         // index
+                il.Emit(OpCodes.Ldelem_Ref);        // args[i]
+                il.Emit(OpCodes.Stloc, GetLocal(f.ParamRegs[i]));
             }
 
             // метки для блоков
