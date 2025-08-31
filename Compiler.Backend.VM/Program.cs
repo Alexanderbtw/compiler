@@ -11,19 +11,23 @@ namespace Compiler.Backend.VM;
 
 public class Program
 {
-    private static void Main(string[] args)
+    private static void Main(
+        string[] args)
     {
         string program = ReadAllInput("main.minl");
         Try(program);
     }
 
-    private static string ReadAllInput(string fn)
+    private static string ReadAllInput(
+        string fn)
     {
         string input = File.ReadAllText(fn);
+
         return input;
     }
 
-    private static void Try(string input)
+    private static void Try(
+        string input)
     {
         var str = new AntlrInputStream(input);
         Console.WriteLine(input);
@@ -51,6 +55,7 @@ public class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("parse completed");
         }
+
         Console.ResetColor();
 
         new SemanticChecker().Check(hir);

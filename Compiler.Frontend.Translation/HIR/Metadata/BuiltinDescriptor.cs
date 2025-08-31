@@ -7,5 +7,4 @@ public sealed record BuiltinDescriptor(
     BuiltinAttr Attributes,
     SimpleType ReturnType = SimpleType.Unknown,
     SimpleType[]? ParamTypes = null, // можно оставить null до этапа типизации
-    BuiltinLoweringKind Lowering = BuiltinLoweringKind.CallRuntime
-);
+    BuiltinLoweringKind Lowering = BuiltinLoweringKind.CallRuntime);

@@ -18,6 +18,6 @@ public enum OpCode
     Br, BrTrue, Ret,
 
     // calls
-    CallUser,    // A = funcIndex, B = argc
-    CallBuiltin, // A = stringId,  B = argc
+    CallUser, // A = funcIndex, B = argc
+    CallBuiltin // A = stringId,  B = argc
 }

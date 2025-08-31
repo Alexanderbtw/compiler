@@ -1,52 +1,76 @@
-using System.Collections.Generic;
-
 using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
 
 namespace Compiler.Frontend.Translation.HIR.Stringify;
 
 internal static class HirPretty
 {
-    public static string Op(BinOp op) => op switch
+    public static string Join<T>(
+        IEnumerable<T> xs,
+        string sep = ", ")
     {
-        BinOp.Assign => "=",
-        BinOp.Add => "+",
-        BinOp.Sub => "-",
-        BinOp.Mul => "*",
-        BinOp.Div => "/",
-        BinOp.Mod => "%",
-        BinOp.Lt  => "<",
-        BinOp.Le  => "<=",
-        BinOp.Gt  => ">",
-        BinOp.Ge  => ">=",
-        BinOp.Eq  => "==",
-        BinOp.Ne  => "!=",
-        BinOp.And => "&&",
-        BinOp.Or  => "||",
-        _ => op.ToString()
-    };
-
-    public static string Op(UnOp op) => op switch
+        return string.Join(
+            separator: sep,
+            values: xs);
+    }
+    public static string Op(
+        BinOp op)
     {
-        UnOp.Neg => "-",
-        UnOp.Not => "!",
-        UnOp.Plus => "+",
-        _ => op.ToString()
-    };
+        return op switch
+        {
+            BinOp.Assign => "=",
+            BinOp.Add => "+",
+            BinOp.Sub => "-",
+            BinOp.Mul => "*",
+            BinOp.Div => "/",
+            BinOp.Mod => "%",
+            BinOp.Lt => "<",
+            BinOp.Le => "<=",
+            BinOp.Gt => ">",
+            BinOp.Ge => ">=",
+            BinOp.Eq => "==",
+            BinOp.Ne => "!=",
+            BinOp.And => "&&",
+            BinOp.Or => "||",
+            _ => op.ToString()
+        };
+    }
 
-    public static string Q(string s)
-        => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
-
-    public static string Qc(char c) => c switch
+    public static string Op(
+        UnOp op)
     {
-        '\\' => "\\\\",
-        '\'' => "\\'",
-        '"' => "\\\"",
-        '\n' => "\\n",
-        '\r' => "\\r",
-        '\t' => "\\t",
-        _ => c.ToString()
-    };
+        return op switch
+        {
+            UnOp.Neg => "-",
+            UnOp.Not => "!",
+            UnOp.Plus => "+",
+            _ => op.ToString()
+        };
+    }
 
-    public static string Join<T>(IEnumerable<T> xs, string sep = ", ")
-        => string.Join(sep, xs);
+    public static string Q(
+        string s)
+    {
+        return s
+            .Replace(
+                oldValue: "\\",
+                newValue: "\\\\")
+            .Replace(
+                oldValue: "\"",
+                newValue: "\\\"");
+    }
+
+    public static string Qc(
+        char c)
+    {
+        return c switch
+        {
+            '\\' => "\\\\",
+            '\'' => "\\'",
+            '"' => "\\\"",
+            '\n' => "\\n",
+            '\r' => "\\r",
+            '\t' => "\\t",
+            _ => c.ToString()
+        };
+    }
 }

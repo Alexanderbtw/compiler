@@ -3,7 +3,11 @@ using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR.Statements;
 
-public sealed record BreakHir(SourceSpan Span) : StmtHir(Span)
+public sealed record BreakHir(
+    SourceSpan Span) : StmtHir(Span)
 {
-    public override string ToString() => "break";
+    public override string ToString()
+    {
+        return "break";
+    }
 }

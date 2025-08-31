@@ -1,29 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <Antlr4 Include="MiniLangLexer.g4">
-            <Package>Compiler.Frontend</Package>
-        </Antlr4>
-        <Antlr4 Include="MiniLangParser.g4">
-            <Package>Compiler.Frontend</Package>
-        </Antlr4>
-    </ItemGroup>
+  <ItemGroup>
+    <Antlr4 Include="MiniLangLexer.g4">
+      <Package>Compiler.Frontend</Package>
+    </Antlr4>
+    <Antlr4 Include="MiniLangParser.g4">
+      <Package>Compiler.Frontend</Package>
+    </Antlr4>
+  </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1"/>
-        <PackageReference Include="Antlr4BuildTasks" Version="12.10.0" PrivateAssets="all"/>
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1"/>
+    <PackageReference Include="Antlr4BuildTasks" Version="12.10.0" PrivateAssets="all"/>
+  </ItemGroup>
 
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-        <NoWarn>3021;1701;1702</NoWarn>
-    </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>3021;1701;1702</NoWarn>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <InternalsVisibleTo Include="Compiler.Tests"/>
-    </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Compiler.Tests"/>
+  </ItemGroup>
 </Project>

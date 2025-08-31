@@ -4,7 +4,13 @@ using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR.Expressions;
 
-public sealed record WhileHir(ExprHir Cond, StmtHir Body, SourceSpan Span) : StmtHir(Span)
+public sealed record WhileHir(
+    ExprHir Cond,
+    StmtHir Body,
+    SourceSpan Span) : StmtHir(Span)
 {
-    public override string ToString() => $"while ({Cond}) {Body}";
+    public override string ToString()
+    {
+        return $"while ({Cond}) {Body}";
+    }
 }

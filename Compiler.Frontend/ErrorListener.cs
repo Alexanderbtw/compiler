@@ -1,6 +1,4 @@
-﻿using System.IO;
-
-using Antlr4.Runtime;
+﻿using Antlr4.Runtime;
 
 namespace Compiler.Frontend;
 
@@ -18,6 +16,13 @@ public class ErrorListener<TSymbol> : ConsoleErrorListener<TSymbol>
         RecognitionException e)
     {
         HadError = true;
-        base.SyntaxError(output, recognizer, offendingSymbol, line, col, msg, e);
+        base.SyntaxError(
+            output: output,
+            recognizer: recognizer,
+            offendingSymbol: offendingSymbol,
+            line: line,
+            charPositionInLine: col,
+            msg: msg,
+            e: e);
     }
 }

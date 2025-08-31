@@ -12,7 +12,7 @@ namespace Compiler.Backend.CLR;
 
 public sealed partial class CilBackend
 {
-    private readonly Dictionary<string, MethodInfo> _rt = new()
+    private readonly Dictionary<string, MethodInfo> _rt = new Dictionary<string, MethodInfo>
     {
         ["Add"] = typeof(Runtime.Runtime).GetMethod(nameof(Runtime.Runtime.Add))!,
         ["Sub"] = typeof(Runtime.Runtime).GetMethod(nameof(Runtime.Runtime.Sub))!,
@@ -33,25 +33,36 @@ public sealed partial class CilBackend
         ["ToBool"] = typeof(Runtime.Runtime).GetMethod(nameof(Runtime.Runtime.ToBool))!
     };
 
-    private readonly static MethodInfo BuiltinsInvoke =
+    private static readonly MethodInfo BuiltinsInvoke =
         typeof(BuiltinsRuntime).GetMethod(nameof(BuiltinsRuntime.Invoke))!;
 
-    public object? RunMain(MirModule mod)
+    public object? RunMain(
+        MirModule mod)
     {
         (Assembly asm, Type type) = Emit(mod);
-        MethodInfo main = type.GetMethod("main", BindingFlags.Public | BindingFlags.Static)
-                          ?? throw new MissingMethodException("entry function 'main' not found");
-        return main.Invoke(null, [Array.Empty<object?>()]);
+        MethodInfo main = type.GetMethod(
+                name: "main",
+                bindingAttr: BindingFlags.Public | BindingFlags.Static)
+            ?? throw new MissingMethodException("entry function 'main' not found");
+
+        return main.Invoke(
+            obj: null,
+            parameters: [Array.Empty<object?>()]);
     }
 
-    private (Assembly asm, Type programType) Emit(MirModule mod, string asmName = "MiniLangDyn")
+    private (Assembly asm, Type programType) Emit(
+        MirModule mod,
+        string asmName = "MiniLangDyn")
     {
         var an = new AssemblyName(asmName);
-        AssemblyBuilder ab = AssemblyBuilder.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndCollect);
+        AssemblyBuilder ab = AssemblyBuilder.DefineDynamicAssembly(
+            name: an,
+            access: AssemblyBuilderAccess.RunAndCollect);
+
         ModuleBuilder mb = ab.DefineDynamicModule(asmName);
         TypeBuilder tb = mb.DefineType(
-            "MiniProgram",
-            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
+            name: "MiniProgram",
+            attr: TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
 
         // MIR simplification: const-folding + copy-prop + branch folding
         new MirSimplifier().Run(mod);
@@ -61,14 +72,16 @@ public sealed partial class CilBackend
 
         // Генерим методы
         var methods = new Dictionary<string, MethodBuilder>();
+
         foreach (MirFunction f in mod.Functions)
         {
             // сигнатура: static object? f(object?[] args)
             MethodBuilder mbuilder = tb.DefineMethod(
-                f.Name,
-                MethodAttributes.Public | MethodAttributes.Static,
-                typeof(object),
-                [typeof(object[])]);
+                name: f.Name,
+                attributes: MethodAttributes.Public | MethodAttributes.Static,
+                returnType: typeof(object),
+                parameterTypes: [typeof(object[])]);
+
             methods[f.Name] = mbuilder;
 
             ILGenerator il = mbuilder.GetILGenerator();
@@ -79,13 +92,20 @@ public sealed partial class CilBackend
             // vreg → local(object)
             var locals = new Dictionary<int, LocalBuilder>();
 
-            LocalBuilder GetLocal(VReg v)
+            LocalBuilder GetLocal(
+                VReg v)
             {
-                if (!locals.TryGetValue(v.Id, out LocalBuilder? lb))
+                if (!locals.TryGetValue(
+                        key: v.Id,
+                        value: out LocalBuilder? lb))
                 {
-                    Type t = GetClrTypeForVReg(f, v);
+                    Type t = GetClrTypeForVReg(
+                        func: f,
+                        v: v);
+
                     locals[v.Id] = lb = il.DeclareLocal(t);
                 }
+
                 return lb;
             }
 
@@ -93,13 +113,20 @@ public sealed partial class CilBackend
             for (var i = 0; i < f.ParamRegs.Count; i++)
             {
                 il.Emit(OpCodes.Ldarg_0); // args
-                il.Emit(OpCodes.Ldc_I4, i); // index
+                il.Emit(
+                    opcode: OpCodes.Ldc_I4,
+                    arg: i); // index
+
                 il.Emit(OpCodes.Ldelem_Ref); // args[i]
-                il.Emit(OpCodes.Stloc, GetLocal(f.ParamRegs[i]));
+                il.Emit(
+                    opcode: OpCodes.Stloc,
+                    local: GetLocal(f.ParamRegs[i]));
             }
 
             // метки для блоков
-            Dictionary<MirBlock, Label> labels = f.Blocks.ToDictionary(b => b, _ => il.DefineLabel());
+            Dictionary<MirBlock, Label> labels = f.Blocks.ToDictionary(
+                keySelector: b => b,
+                elementSelector: _ => il.DefineLabel());
 
             // проходим по блокам в порядке объявления
             foreach (MirBlock b in f.Blocks)
@@ -108,7 +135,15 @@ public sealed partial class CilBackend
 
                 // инструкции
                 foreach (MirInstr ins in b.Instructions)
-                    EmitInstr(il, f, ins, GetLocal, methods, funcNames);
+                {
+                    EmitInstr(
+                        il: il,
+                        f: f,
+                        ins: ins,
+                        getLocal: GetLocal,
+                        methods: methods,
+                        funcNames: funcNames);
+                }
 
                 // терминатор
                 switch (b.Terminator)
@@ -122,38 +157,87 @@ public sealed partial class CilBackend
                         }
                         else if (r.Value is VReg rv)
                         {
-                            il.Emit(OpCodes.Ldloc, GetLocal(rv));
-                            Type rt = GetClrTypeForOperand(f, rv);
-                            if (rt == typeof(long)) il.Emit(OpCodes.Box, typeof(long));
-                            else if (rt == typeof(bool)) il.Emit(OpCodes.Box, typeof(bool));
-                            else if (rt == typeof(char)) il.Emit(OpCodes.Box, typeof(char));
+                            il.Emit(
+                                opcode: OpCodes.Ldloc,
+                                local: GetLocal(rv));
+
+                            Type rt = GetClrTypeForOperand(
+                                f: f,
+                                v: rv);
+
+                            if (rt == typeof(long))
+                            {
+                                il.Emit(
+                                    opcode: OpCodes.Box,
+                                    cls: typeof(long));
+                            }
+                            else if (rt == typeof(bool))
+                            {
+                                il.Emit(
+                                    opcode: OpCodes.Box,
+                                    cls: typeof(bool));
+                            }
+                            else if (rt == typeof(char))
+                            {
+                                il.Emit(
+                                    opcode: OpCodes.Box,
+                                    cls: typeof(char));
+                            }
                         }
                         else if (r.Value is Const rc)
                         {
-                            EmitConst(il, rc.Value); // already boxed
+                            EmitConst(
+                                il: il,
+                                val: rc.Value); // already boxed
                         }
                         else
                         {
                             // generic operand (shouldn't happen often)
-                            EmitOperand(il, r.Value, GetLocal);
+                            EmitOperand(
+                                il: il,
+                                op: r.Value,
+                                getLocal: GetLocal);
                         }
+
                         il.Emit(OpCodes.Ret);
+
                         break;
                     case Br br:
-                        il.Emit(OpCodes.Br, labels[br.Target]);
+                        il.Emit(
+                            opcode: OpCodes.Br,
+                            label: labels[br.Target]);
+
                         break;
                     case BrCond bc:
-                        if (bc.Cond is VReg cv && GetClrTypeForOperand(f, cv) == typeof(bool))
+                        if (bc.Cond is VReg cv && GetClrTypeForOperand(
+                                f: f,
+                                v: cv) == typeof(bool))
                         {
-                            il.Emit(OpCodes.Ldloc, GetLocal(cv));
+                            il.Emit(
+                                opcode: OpCodes.Ldloc,
+                                local: GetLocal(cv));
                         }
                         else
                         {
-                            EmitLoadAsObject(il, f, bc.Cond, GetLocal);
-                            il.Emit(OpCodes.Call, _rt["ToBool"]);
+                            EmitLoadAsObject(
+                                il: il,
+                                f: f,
+                                op: bc.Cond,
+                                getLocal: GetLocal);
+
+                            il.Emit(
+                                opcode: OpCodes.Call,
+                                meth: _rt["ToBool"]);
                         }
-                        il.Emit(OpCodes.Brtrue, labels[bc.IfTrue]);
-                        il.Emit(OpCodes.Br, labels[bc.IfFalse]);
+
+                        il.Emit(
+                            opcode: OpCodes.Brtrue,
+                            label: labels[bc.IfTrue]);
+
+                        il.Emit(
+                            opcode: OpCodes.Br,
+                            label: labels[bc.IfFalse]);
+
                         break;
                     default:
                         throw new NotSupportedException($"Terminator {b.Terminator.GetType().Name}");
@@ -166,6 +250,7 @@ public sealed partial class CilBackend
         }
 
         Type programType = tb.CreateType()!;
+
         return (ab, programType);
     }
 
@@ -182,22 +267,54 @@ public sealed partial class CilBackend
         switch (ins)
         {
             case Move mv:
-                EmitMove(il, f, mv, getLocal);
+                EmitMove(
+                    il: il,
+                    f: f,
+                    mv: mv,
+                    getLocal: getLocal);
+
                 break;
             case Bin bi:
-                EmitBin(il, f, bi, getLocal);
+                EmitBin(
+                    il: il,
+                    f: f,
+                    bi: bi,
+                    getLocal: getLocal);
+
                 break;
             case Un un:
-                EmitUn(il, f, un, getLocal);
+                EmitUn(
+                    il: il,
+                    f: f,
+                    un: un,
+                    getLocal: getLocal);
+
                 break;
             case LoadIndex li:
-                EmitLoadIndex(il, f, li, getLocal);
+                EmitLoadIndex(
+                    il: il,
+                    f: f,
+                    li: li,
+                    getLocal: getLocal);
+
                 break;
             case StoreIndex si:
-                EmitStoreIndex(il, f, si, getLocal);
+                EmitStoreIndex(
+                    il: il,
+                    f: f,
+                    si: si,
+                    getLocal: getLocal);
+
                 break;
             case Call cl:
-                EmitCall(il, f, cl, getLocal, methods, funcNames);
+                EmitCall(
+                    il: il,
+                    f: f,
+                    cl: cl,
+                    getLocal: getLocal,
+                    methods: methods,
+                    funcNames: funcNames);
+
                 break;
             default:
                 throw new NotSupportedException($"Instr {ins.GetType().Name}");

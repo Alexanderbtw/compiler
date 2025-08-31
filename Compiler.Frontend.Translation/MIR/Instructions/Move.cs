@@ -3,7 +3,12 @@ using Compiler.Frontend.Translation.MIR.Operands;
 
 namespace Compiler.Frontend.Translation.MIR.Instructions;
 
-public sealed record Move(VReg Dst, MOperand Src) : MirInstr
+public sealed record Move(
+    VReg Dst,
+    MOperand Src) : MirInstr
 {
-    public override string ToString() => $"{Dst} = {Src}";
+    public override string ToString()
+    {
+        return $"{Dst} = {Src}";
+    }
 }

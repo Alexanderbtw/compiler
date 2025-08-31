@@ -2,7 +2,6 @@ using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Expressions;
 using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
 using Compiler.Frontend.Translation.HIR.Statements;
-using Compiler.Frontend.Translation.HIR.Statements.Abstractions;
 
 namespace Compiler.Tests.HIR;
 
@@ -11,19 +10,29 @@ public class HirBuilderTests
     [Fact]
     public void CharLiteralNodePresent()
     {
-        var hir = TestUtils.BuildHir("fn main(){ var c = 'A'; }");
-        var let = hir.Functions[0].Body.Statements.OfType<LetHir>().First();
+        ProgramHir hir = TestUtils.BuildHir("fn main(){ var c = 'A'; }");
+        LetHir let = hir
+            .Functions[0]
+            .Body
+            .Statements
+            .OfType<LetHir>()
+            .First();
+
         var charNode = let.Init as CharHir;
         Assert.NotNull(charNode);
-        Assert.Equal('A', charNode!.Value);
+        Assert.Equal(
+            expected: 'A',
+            actual: charNode!.Value);
     }
 
     [Fact]
     public void EmptyProgram()
     {
-        var hir = TestUtils.BuildHir("fn main() {}");
+        ProgramHir hir = TestUtils.BuildHir("fn main() {}");
         Assert.Single(hir.Functions);
-        Assert.Equal("main", hir.Functions[0].Name);
+        Assert.Equal(
+            expected: "main",
+            actual: hir.Functions[0].Name);
     }
 
     [Fact]
@@ -34,9 +43,12 @@ public class HirBuilderTests
                 if (n <= 1) return 1;
                 return n * fact(n - 1);
             }";
-        var hir = TestUtils.BuildHir(src);
-        var fact = hir.Functions.Single(f => f.Name == "fact");
-        Assert.Equal(2, fact.Body.Statements.Count);
+
+        ProgramHir hir = TestUtils.BuildHir(src);
+        FuncHir fact = hir.Functions.Single(f => f.Name == "fact");
+        Assert.Equal(
+            expected: 2,
+            actual: fact.Body.Statements.Count);
     }
 
     [Fact]
@@ -50,18 +62,40 @@ public class HirBuilderTests
                     continue;
                 }
             }";
-        var hir = TestUtils.BuildHir(src);
-        var body = hir.Functions[0].Body;
 
-        var whileStmt = body.Statements.OfType<BlockHir>().Single().Statements.OfType<WhileHir>().Single();
+        ProgramHir hir = TestUtils.BuildHir(src);
+        BlockHir body = hir.Functions[0].Body;
+
+        WhileHir whileStmt = body
+            .Statements
+            .OfType<BlockHir>()
+            .Single()
+            .Statements
+            .OfType<WhileHir>()
+            .Single();
+
         var whileBody = (BlockHir)whileStmt.Body;
 
         Assert.True(whileBody.Statements.Count >= 2);
         var iterBlock = Assert.IsType<BlockHir>(whileBody.Statements[1]);
-        var iterExprStmts = iterBlock.Statements.OfType<ExprStmtHir>().ToList();
-        Assert.Equal(2, iterExprStmts.Count);
-        Assert.All(iterExprStmts, es => Assert.IsType<BinHir>(es.Expr));
-        Assert.All(iterExprStmts, es => Assert.Equal(BinOp.Assign, ((BinHir)es.Expr!).Op));
+        List<ExprStmtHir> iterExprStmts = iterBlock
+            .Statements
+            .OfType<ExprStmtHir>()
+            .ToList();
+
+        Assert.Equal(
+            expected: 2,
+            actual: iterExprStmts.Count);
+
+        Assert.All(
+            collection: iterExprStmts,
+            action: es => Assert.IsType<BinHir>(es.Expr));
+
+        Assert.All(
+            collection: iterExprStmts,
+            action: es => Assert.Equal(
+                expected: BinOp.Assign,
+                actual: ((BinHir)es.Expr!).Op));
     }
 
     [Fact]
@@ -74,13 +108,20 @@ public class HirBuilderTests
             arr[0] = 42;
             var v = get(arr, 0);
         }";
-        var hir = TestUtils.BuildHir(src);
 
-        var exprs = hir.Functions
+        ProgramHir hir = TestUtils.BuildHir(src);
+
+        List<ExprHir> exprs = hir
+            .Functions
             .SelectMany(f => TestUtils.FlattenStmts(f.Body))
             .ToList();
 
-        Assert.Contains(exprs, e => e is IndexHir);
-        Assert.Contains(exprs, e => e is CallHir);
+        Assert.Contains(
+            collection: exprs,
+            filter: e => e is IndexHir);
+
+        Assert.Contains(
+            collection: exprs,
+            filter: e => e is CallHir);
     }
 }

@@ -1,6 +1,10 @@
 namespace Compiler.Frontend.Translation.MIR.Operands;
 
-public sealed record VReg(int Id) : MOperand
+public sealed record VReg(
+    int Id) : MOperand
 {
-    public override string ToString() => $"%t{Id}";
+    public override string ToString()
+    {
+        return $"%t{Id}";
+    }
 }

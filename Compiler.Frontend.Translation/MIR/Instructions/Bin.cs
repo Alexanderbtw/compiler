@@ -3,7 +3,14 @@ using Compiler.Frontend.Translation.MIR.Operands;
 
 namespace Compiler.Frontend.Translation.MIR.Instructions;
 
-public sealed record Bin(VReg Dst, MBinOp Op, MOperand L, MOperand R) : MirInstr
+public sealed record Bin(
+    VReg Dst,
+    MBinOp Op,
+    MOperand L,
+    MOperand R) : MirInstr
 {
-    public override string ToString() => $"{Dst} = {Op.ToString().ToLower()} {L}, {R}";
+    public override string ToString()
+    {
+        return $"{Dst} = {Op.ToString().ToLower()} {L}, {R}";
+    }
 }

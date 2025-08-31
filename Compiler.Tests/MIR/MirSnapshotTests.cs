@@ -1,3 +1,4 @@
+using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.MIR;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
@@ -17,7 +18,7 @@ public class MirSnapshotTests
             }
             fn main() { return fact(5); }";
 
-        var hir = TestUtils.BuildHir(src);
+        ProgramHir hir = TestUtils.BuildHir(src);
         MirModule mir = new HirToMir().Lower(hir);
 
         MirFunction fact = mir.Functions.Single(f => f.Name == "fact");
@@ -27,12 +28,30 @@ public class MirSnapshotTests
         Assert.Single(fact.ParamRegs);
 
         // должны быть: одно условное ветвление, один возврат в then, умножение и рекурсивный вызов
-        List<MirInstr> ins = fact.Blocks.SelectMany(b => b.Instructions).ToList();
-        List<MirInstr?> terms = fact.Blocks.Select(b => b.Terminator).ToList();
+        List<MirInstr> ins = fact
+            .Blocks
+            .SelectMany(b => b.Instructions)
+            .ToList();
 
-        Assert.Contains(terms, t => t is BrCond); // условный переход
-        Assert.Contains(ins, i => i is Bin { Op: MBinOp.Mul }); // умножение
-        Assert.Contains(ins, i => i is Call { Callee: "fact" }); // рекурсивный вызов
-        Assert.Contains(terms, t => t is Ret); // хотя бы один возврат
+        List<MirInstr?> terms = fact
+            .Blocks
+            .Select(b => b.Terminator)
+            .ToList();
+
+        Assert.Contains(
+            collection: terms,
+            filter: t => t is BrCond); // условный переход
+
+        Assert.Contains(
+            collection: ins,
+            filter: i => i is Bin { Op: MBinOp.Mul }); // умножение
+
+        Assert.Contains(
+            collection: ins,
+            filter: i => i is Call { Callee: "fact" }); // рекурсивный вызов
+
+        Assert.Contains(
+            collection: terms,
+            filter: t => t is Ret); // хотя бы один возврат
     }
 }
