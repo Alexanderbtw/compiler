@@ -603,7 +603,7 @@ internal static class TestUtils
         {
             Value ret = virtualMachine.Execute();
 
-            return (ret, sb
+            return (TryUnwrapVmValue(ret), sb
                 .ToString()
                 .TrimEnd());
         }
@@ -633,12 +633,25 @@ internal static class TestUtils
                 ValueTag.Bool => value.AsBool(),
                 ValueTag.Char => value.AsChar(),
                 ValueTag.String => value.AsStr(),
-                ValueTag.Array => value.AsArr(),
-                ValueTag.Object => value,
+                ValueTag.Array => VmArrayToHostArray(value.AsArr()),
+                ValueTag.Object => value.Ref, // unwrap boxed reference
                 _ => throw new ArgumentOutOfRangeException()
             },
             _ => v
         };
+    }
+
+    private static object?[] VmArrayToHostArray(
+        VmArray arr)
+    {
+        object?[] res = new object?[arr.Length];
+
+        for (int i = 0; i < arr.Length; i++)
+        {
+            res[i] = TryUnwrapVmValue(arr.Data[i]);
+        }
+
+        return res;
     }
 }
 
