@@ -6,5 +6,6 @@ fn fact(n) {
 fn main() {
     var n = 20;
     var r = fact(n);
-    print(r); // 2432902008176640000
+    print(r);
 }
+// EXPECT:2432902008176640000

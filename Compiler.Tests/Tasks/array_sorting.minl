@@ -36,3 +36,7 @@ fn main() {
     print(a[0]);
     print(a[N - 1]);
 }
+// RET: null
+// expected
+// 0
+// 9999
