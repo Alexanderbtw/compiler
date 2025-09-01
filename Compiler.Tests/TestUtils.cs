@@ -629,11 +629,11 @@ internal static class TestUtils
             Value value => value.Tag switch
             {
                 ValueTag.Null => null,
-                ValueTag.I64 => value.AsLong(),
+                ValueTag.I64 => value.AsInt64(),
                 ValueTag.Bool => value.AsBool(),
                 ValueTag.Char => value.AsChar(),
-                ValueTag.String => value.AsStr(),
-                ValueTag.Array => VmArrayToHostArray(value.AsArr()),
+                ValueTag.String => value.AsString(),
+                ValueTag.Array => VmArrayToHostArray(value.AsArray()),
                 ValueTag.Object => value.Ref, // unwrap boxed reference
                 _ => throw new ArgumentOutOfRangeException()
             },

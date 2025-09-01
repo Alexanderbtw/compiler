@@ -15,7 +15,7 @@ using Compiler.Interpreter.Signals;
 namespace Compiler.Interpreter;
 
 /// <summary>Tree-walking interpreter for MiniLang over HIR.</summary>
-public class Interpreter
+public sealed class Interpreter
 {
     private readonly Dictionary<string, FuncHir> _funcs;
     private readonly Stack<Frame> _stack = new Stack<Frame>();

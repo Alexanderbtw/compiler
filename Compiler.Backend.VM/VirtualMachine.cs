@@ -1,184 +1,190 @@
 namespace Compiler.Backend.VM;
 
 public sealed class VirtualMachine(
-    VmModule mod,
+    VmModule module,
     int stackSize = 1024)
 {
-    private readonly Stack<Frame> _call = new Stack<Frame>(32);
+    private readonly Stack<CallFrame> _callStack = new Stack<CallFrame>(32);
+    private readonly Value[] _operandStack = new Value[stackSize];
 
-    private int _sp;
-    private readonly Value[] _stack = new Value[stackSize];
+    private int _stackPointer;
 
     public Value Execute(
-        string entry = "main",
-        ReadOnlySpan<Value> args = default)
+        string entryFunctionName = "main",
+        ReadOnlySpan<Value> arguments = default)
     {
-        if (!mod.TryGetFunctionIndex(
-                name: entry,
-                idx: out int i))
+        if (!module.TryGetFunctionIndex(
+                name: entryFunctionName,
+                idx: out int entryIndex))
         {
-            throw new InvalidOperationException($"entry '{entry}' not found");
+            throw new InvalidOperationException($"entry '{entryFunctionName}' not found");
         }
 
-        Frame cur = NewFrame(
-            fnIdx: i,
-            args: args);
+        CallFrame currentFrame = CreateFrame(
+            functionIndex: entryIndex,
+            arguments: arguments);
 
         while (true)
         {
-            if (cur.Pc < 0 || cur.Pc >= cur.Fn.Code.Count)
+            if (currentFrame.ProgramCounter < 0 || currentFrame.ProgramCounter >= currentFrame.Function.Code.Count)
             {
                 throw new InvalidOperationException("PC out of range");
             }
 
-            Instr ins = cur.Fn.Code[cur.Pc++];
+            Instr instruction = currentFrame.Function.Code[currentFrame.ProgramCounter++];
 
-            switch (ins.Op)
+            switch (instruction.Op)
             {
-                // consts / locals
+                // constants / locals
                 case OpCode.LdcNull:
-                    Push(Value.Null);
+                    PushValue(Value.Null);
 
                     break;
+
                 case OpCode.LdcI64:
-                    Push(Value.FromLong(ins.Imm));
+                    PushValue(Value.FromLong(instruction.Imm));
 
                     break;
+
                 case OpCode.LdcBool:
-                    Push(Value.FromBool(ins.Imm != 0));
+                    PushValue(Value.FromBool(instruction.Imm != 0));
 
                     break;
+
                 case OpCode.LdcChar:
-                    Push(Value.FromChar((char)ins.Imm));
+                    PushValue(Value.FromChar((char)instruction.Imm));
 
                     break;
+
                 case OpCode.LdcStr:
-                    Push(Value.FromString(mod.StringPool[ins.Idx]));
+                    PushValue(Value.FromString(module.StringPool[instruction.Idx]));
 
                     break;
 
                 case OpCode.LdLoc:
-                    Push(cur.Locals[ins.A]);
+                    PushValue(currentFrame.Locals[instruction.A]);
 
                     break;
+
                 case OpCode.StLoc:
-                    cur.Locals[ins.A] = Pop();
+                    currentFrame.Locals[instruction.A] = PopValue();
 
                     break;
+
                 case OpCode.Pop:
-                    Pop();
+                    PopValue();
 
                     break;
 
                 // arithmetic / logic
                 case OpCode.Add:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromLong(l.AsLong() + r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromLong(left.AsInt64() + right.AsInt64()));
 
                         break;
                     }
                 case OpCode.Sub:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromLong(l.AsLong() - r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromLong(left.AsInt64() - right.AsInt64()));
 
                         break;
                     }
                 case OpCode.Mul:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromLong(l.AsLong() * r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromLong(left.AsInt64() * right.AsInt64()));
 
                         break;
                     }
                 case OpCode.Div:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromLong(l.AsLong() / r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromLong(left.AsInt64() / right.AsInt64()));
 
                         break;
                     }
                 case OpCode.Mod:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromLong(l.AsLong() % r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromLong(left.AsInt64() % right.AsInt64()));
 
                         break;
                     }
                 case OpCode.Neg:
                     {
-                        Value x = Pop();
-                        Push(Value.FromLong(-x.AsLong()));
+                        Value value = PopValue();
+                        PushValue(Value.FromLong(-value.AsInt64()));
 
                         break;
                     }
                 case OpCode.Not:
                     {
-                        Value x = CoerceBool(Pop());
-                        Push(Value.FromBool(!x.AsBool()));
+                        Value value = CoerceToBoolean(PopValue());
+                        PushValue(Value.FromBool(!value.AsBool()));
 
                         break;
                     }
 
                 case OpCode.Eq:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(
                             Value.FromBool(
-                                EqualsVal(
-                                    a: l,
-                                    b: r)));
+                                AreValuesEqual(
+                                    a: left,
+                                    b: right)));
 
                         break;
                     }
                 case OpCode.Ne:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(
                             Value.FromBool(
-                                !EqualsVal(
-                                    a: l,
-                                    b: r)));
+                                !AreValuesEqual(
+                                    a: left,
+                                    b: right)));
 
                         break;
                     }
                 case OpCode.Lt:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromBool(l.AsLong() < r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromBool(left.AsInt64() < right.AsInt64()));
 
                         break;
                     }
                 case OpCode.Le:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromBool(l.AsLong() <= r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromBool(left.AsInt64() <= right.AsInt64()));
 
                         break;
                     }
                 case OpCode.Gt:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromBool(l.AsLong() > r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromBool(left.AsInt64() > right.AsInt64()));
 
                         break;
                     }
                 case OpCode.Ge:
                     {
-                        Value r = Pop();
-                        Value l = Pop();
-                        Push(Value.FromBool(l.AsLong() >= r.AsLong()));
+                        Value right = PopValue();
+                        Value left = PopValue();
+                        PushValue(Value.FromBool(left.AsInt64() >= right.AsInt64()));
 
                         break;
                     }
@@ -186,54 +192,56 @@ public sealed class VirtualMachine(
                 // arrays
                 case OpCode.LdElem:
                     {
-                        int idx = (int)Pop()
-                            .AsLong();
+                        int elementIndex = (int)PopValue()
+                            .AsInt64();
 
-                        VmArray arr = Pop()
-                            .AsArr();
+                        VmArray array = PopValue()
+                            .AsArray();
 
-                        Push(arr[idx]);
+                        PushValue(array[elementIndex]);
 
                         break;
                     }
                 case OpCode.StElem:
                     {
-                        Value val = Pop();
-                        int idx = (int)Pop()
-                            .AsLong();
+                        Value value = PopValue();
+                        int elementIndex = (int)PopValue()
+                            .AsInt64();
 
-                        VmArray arr = Pop()
-                            .AsArr();
+                        VmArray array = PopValue()
+                            .AsArray();
 
-                        arr[idx] = val;
+                        array[elementIndex] = value;
 
                         break;
                     }
 
-                // control
+                // control flow
                 case OpCode.Br:
-                    cur.Pc = ins.A;
+                    currentFrame.ProgramCounter = instruction.A;
 
                     break;
+
                 case OpCode.BrTrue:
-                    if (CoerceBool(Pop())
+                    if (CoerceToBoolean(PopValue())
                         .AsBool())
                     {
-                        cur.Pc = ins.A;
+                        currentFrame.ProgramCounter = instruction.A;
                     }
 
                     break;
+
                 case OpCode.Ret:
                     {
-                        Value ret = Pop();
+                        Value returnValue = PopValue();
 
-                        if (_call.Count == 0)
+                        if (_callStack.Count == 0)
                         {
-                            return ret;
+                            return returnValue;
                         }
 
-                        cur = _call.Pop(); // restore caller
-                        Push(ret);
+                        currentFrame = _callStack.Pop(); // restore caller
+                        PushValue(returnValue);
 
                         break;
                     }
@@ -241,67 +249,70 @@ public sealed class VirtualMachine(
                 // calls
                 case OpCode.CallUser:
                     {
-                        // pop args (rightmost at stack top), pass in order of function parameters
-                        int argc = ins.B;
-                        var argv = new Value[argc];
+                        // Pop args (rightmost at stack top), pass in the order of function parameters
+                        int argumentCount = instruction.B;
+                        var callArguments = new Value[argumentCount];
 
-                        for (int idx = argc - 1; idx >= 0; --idx)
+                        for (int index = argumentCount - 1; index >= 0; --index)
                         {
-                            argv[idx] = Pop();
+                            callArguments[index] = PopValue();
                         }
 
-                        _call.Push(cur); // save caller
-                        cur = NewFrame(
-                            fnIdx: ins.A,
-                            args: argv);
+                        _callStack.Push(currentFrame); // save caller
+                        currentFrame = CreateFrame(
+                            functionIndex: instruction.A,
+                            arguments: callArguments);
 
                         break;
                     }
+
                 case OpCode.CallBuiltin:
                     {
-                        int argc = ins.B;
-                        var argv = new Value[argc];
+                        int argumentCount = instruction.B;
+                        var callArguments = new Value[argumentCount];
 
-                        for (int idx = argc - 1; idx >= 0; --idx)
+                        for (int index = argumentCount - 1; index >= 0; --index)
                         {
-                            argv[idx] = Pop();
+                            callArguments[index] = PopValue();
                         }
 
-                        string name = mod.StringPool[ins.A];
-                        Value r = BuiltinsVm.Invoke(
-                            name: name,
-                            args: argv);
+                        string builtinName = module.StringPool[instruction.A];
+                        Value result = BuiltinsVm.Invoke(
+                            name: builtinName,
+                            args: callArguments);
 
-                        Push(r);
+                        PushValue(result);
 
                         break;
                     }
+
                 case OpCode.NewArr:
                     {
-                        int n = (int)Pop()
-                            .AsLong();
+                        int length = (int)PopValue()
+                            .AsInt64();
 
-                        Push(Value.FromArray(new VmArray(n)));
+                        PushValue(Value.FromArray(new VmArray(length)));
 
                         break;
                     }
+
                 case OpCode.Len:
                     {
-                        Value x = Pop();
+                        Value value = PopValue();
 
-                        switch (x.Tag)
+                        switch (value.Tag)
                         {
                             case ValueTag.String:
-                                Push(
+                                PushValue(
                                     Value.FromLong(
-                                        x.AsStr()
+                                        value.AsString()
                                             .Length));
 
                                 break;
                             case ValueTag.Array:
-                                Push(
+                                PushValue(
                                     Value.FromLong(
-                                        x.AsArr()
+                                        value.AsArray()
                                             .Length));
 
                                 break;
@@ -313,43 +324,26 @@ public sealed class VirtualMachine(
                     }
 
                 default:
-                    throw new NotSupportedException(ins.Op.ToString());
+                    throw new NotSupportedException(instruction.Op.ToString());
             }
         }
     }
 
-    private static Value CoerceBool(
-        Value v)
-    {
-        return v.Tag switch
-        {
-            ValueTag.Bool => v,
-            ValueTag.Null => Value.FromBool(false),
-            ValueTag.I64 => Value.FromBool(v.I64 != 0),
-            ValueTag.Char => Value.FromBool(v.C != '\0'),
-            ValueTag.String => Value.FromBool(!string.IsNullOrEmpty(v.AsStr())),
-            ValueTag.Array => Value.FromBool(
-                v.AsArr()
-                    .Length != 0),
-            _ => Value.FromBool(v.Ref is not null)
-        };
-    }
-
-    private static bool EqualsVal(
+    private static bool AreValuesEqual(
         Value a,
         Value b)
     {
         if (a.Tag != b.Tag)
         {
-            // попытка сравнить i64 с char как числа
+            // attempt to compare i64 with char as numbers
             if (a.Tag == ValueTag.I64 && b.Tag == ValueTag.Char)
             {
-                return a.I64 == b.C;
+                return a.AsInt64() == b.Char;
             }
 
             if (a.Tag == ValueTag.Char && b.Tag == ValueTag.I64)
             {
-                return a.C == b.I64;
+                return a.Char == b.AsInt64();
             }
 
             return false;
@@ -358,10 +352,10 @@ public sealed class VirtualMachine(
         return a.Tag switch
         {
             ValueTag.Null => true,
-            ValueTag.I64 => a.I64 == b.I64,
-            ValueTag.Bool => a.B == b.B,
-            ValueTag.Char => a.C == b.C,
-            ValueTag.String => a.AsStr() == b.AsStr(),
+            ValueTag.I64 => a.AsInt64() == b.AsInt64(),
+            ValueTag.Bool => a.AsBool() == b.AsBool(),
+            ValueTag.Char => a.Char == b.Char,
+            ValueTag.String => a.AsString() == b.AsString(),
             ValueTag.Array => ReferenceEquals(
                 objA: a.Ref,
                 objB: b.Ref),
@@ -371,42 +365,65 @@ public sealed class VirtualMachine(
         };
     }
 
-    private Frame NewFrame(
-        int fnIdx,
-        ReadOnlySpan<Value> args)
+    private static Value CoerceToBoolean(
+        Value value)
     {
-        VmFunction fn = mod.Functions[fnIdx];
-
-        if (args.Length != fn.Arity)
+        return value.Tag switch
         {
-            throw new InvalidOperationException($"{fn.Name} expects {fn.Arity} args, got {args.Length}");
+            ValueTag.Bool => value,
+            ValueTag.Null => Value.FromBool(false),
+            ValueTag.I64 => Value.FromBool(value.AsInt64() != 0),
+            ValueTag.Char => Value.FromBool(value.Char != '\0'),
+            ValueTag.String => Value.FromBool(!string.IsNullOrEmpty(value.AsString())),
+            ValueTag.Array => Value.FromBool(
+                value.AsArray()
+                    .Length != 0),
+            _ => Value.FromBool(value.Ref is not null)
+        };
+    }
+
+    private CallFrame CreateFrame(
+        int functionIndex,
+        ReadOnlySpan<Value> arguments)
+    {
+        VmFunction function = module.Functions[functionIndex];
+
+        if (arguments.Length != function.Arity)
+        {
+            throw new InvalidOperationException($"{function.Name} expects {function.Arity} args, got {arguments.Length}");
         }
 
-        var frame = new Frame { Fn = fn, Locals = new Value[fn.NLocals], Pc = 0 };
-
-        // разместить параметры в их локальных слотах
-        for (int i = 0; i < fn.Arity; i++)
+        var frame = new CallFrame
         {
-            frame.Locals[fn.ParamLocalIndices[i]] = args[i];
+            Function = function,
+            Locals = new Value[function.NLocals],
+            ProgramCounter = 0
+        };
+
+        // place parameters into their local slots
+        for (int i = 0; i < function.Arity; i++)
+        {
+            frame.Locals[function.ParamLocalIndices[i]] = arguments[i];
         }
 
         return frame;
     }
-    private Value Pop()
+
+    private Value PopValue()
     {
-        return _stack[--_sp];
+        return _operandStack[--_stackPointer];
     }
 
-    private void Push(
-        Value v)
+    private void PushValue(
+        Value value)
     {
-        _stack[_sp++] = v;
+        _operandStack[_stackPointer++] = value;
     }
 
-    private struct Frame
+    private struct CallFrame
     {
-        public VmFunction Fn;
+        public VmFunction Function;
         public Value[] Locals;
-        public int Pc;
+        public int ProgramCounter;
     }
 }

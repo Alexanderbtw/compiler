@@ -12,21 +12,15 @@ public struct Instr
     }
 }
 
-public sealed class VmFunction
+public sealed class VmFunction(
+    string name,
+    int arity)
 {
-    public VmFunction(
-        string name,
-        int arity)
-    {
-        Name = name;
-        Arity = arity;
-    }
-
-    public int Arity { get; }
+    public int Arity { get; } = arity;
 
     public List<Instr> Code { get; } = [];
 
-    public string Name { get; }
+    public string Name { get; } = name;
 
     public int NLocals { get; set; }
 

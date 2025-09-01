@@ -29,7 +29,7 @@ public static class BuiltinsVm
         }
 
         int n = checked((int)args[0]
-            .AsLong());
+            .AsInt64());
 
         return Value.FromArray(new VmArray(n));
     }
@@ -59,7 +59,7 @@ public static class BuiltinsVm
 
         return Value.FromChar(
             (char)args[0]
-                .AsLong());
+                .AsInt64());
     }
     private static Value ClockMs(
         ReadOnlySpan<Value> args)
@@ -69,7 +69,6 @@ public static class BuiltinsVm
             throw new InvalidOperationException("clock_ms() expects 0 args");
         }
 
-        // монотонное время в миллисекундах
         return Value.FromLong(Stopwatch.GetTimestamp() * 1000 / Stopwatch.Frequency);
     }
     private static Value Len(
@@ -85,10 +84,10 @@ public static class BuiltinsVm
         return x.Tag switch
         {
             ValueTag.String => Value.FromLong(
-                x.AsStr()
+                x.AsString()
                     .Length),
             ValueTag.Array => Value.FromLong(
-                x.AsArr()
+                x.AsArray()
                     .Length),
             _ => throw new InvalidOperationException("len: unsupported type")
         };
@@ -107,7 +106,7 @@ public static class BuiltinsVm
                     .AsChar())
             : Value.FromLong(
                 args[0]
-                    .AsStr()[0]);
+                    .AsString()[0]);
     }
 
     private static Value Print(

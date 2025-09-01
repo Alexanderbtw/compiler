@@ -6,325 +6,327 @@ using Compiler.Frontend.Translation.MIR.Operands;
 namespace Compiler.Frontend.Translation.MIR;
 
 /// <summary>
-///     MIR simplification: constant folding, copy-propagation inside basic blocks,
+///     MIR simplification pass: constant folding, copy-propagation inside basic blocks,
 ///     and simple branch folding (BrCond with const bool).
 ///     Conservative by design (no reordering, no DCE beyond removing no-op moves).
 /// </summary>
 public sealed class MirSimplifier
 {
     public void Run(
-        MirModule m)
+        MirModule mirModule)
     {
-        foreach (MirFunction f in m.Functions)
+        foreach (MirFunction function in mirModule.Functions)
         {
-            SimplifyFunction(f);
+            SimplifyFunction(function);
         }
     }
 
     public void SimplifyFunction(
-        MirFunction f)
+        MirFunction function)
     {
-        foreach (MirBlock b in f.Blocks)
+        foreach (MirBlock basicBlock in function.Blocks)
         {
-            // env maps vreg.Id -> MOperand (Const or VReg)
-            var env = new Dictionary<int, MOperand>();
-            var newIns = new List<MirInstr>(b.Instructions.Count);
+            // Environment maps vreg.Id -> MOperand (Const or VReg)
+            var valueEnvironment = new Dictionary<int, MOperand>();
+            var rewrittenInstructions = new List<MirInstr>(basicBlock.Instructions.Count);
 
-            foreach (MirInstr ins in b.Instructions)
+            foreach (MirInstr instruction in basicBlock.Instructions)
             {
-                switch (ins)
+                switch (instruction)
                 {
-                    case Move mv:
+                    case Move moveInstruction:
                         {
-                            MOperand src = Resolve(
-                                env: env,
-                                op: mv.Src);
+                            MOperand source = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: moveInstruction.Src);
 
-                            // kill old mapping for dst (it will be overwritten now)
-                            env[mv.Dst.Id] = src;
+                            // Overwrite mapping for destination (it will now refer to the new source)
+                            valueEnvironment[moveInstruction.Dst.Id] = source;
 
                             // Skip no-op move: v <- v
-                            if (src is VReg v && v.Id == mv.Dst.Id)
+                            if (source is VReg sourceReg && sourceReg.Id == moveInstruction.Dst.Id)
                             {
                                 break;
                             }
 
-                            newIns.Add(
+                            rewrittenInstructions.Add(
                                 new Move(
-                                    Dst: mv.Dst,
-                                    Src: src));
+                                    Dst: moveInstruction.Dst,
+                                    Src: source));
 
                             break;
                         }
 
-                    case Bin bi:
+                    case Bin binaryInstruction:
                         {
-                            MOperand l = Resolve(
-                                env: env,
-                                op: bi.L);
+                            MOperand left = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: binaryInstruction.L);
 
-                            MOperand r = Resolve(
-                                env: env,
-                                op: bi.R);
+                            MOperand right = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: binaryInstruction.R);
 
-                            if (l is Const lc && r is Const rc && TryEvalBin(
-                                    op: bi.Op,
-                                    l: lc.Value,
-                                    r: rc.Value,
-                                    res: out object? res))
+                            if (left is Const leftConst && right is Const rightConst &&
+                                TryEvaluateBinaryConst(
+                                    op: binaryInstruction.Op,
+                                    leftValue: leftConst.Value,
+                                    rightValue: rightConst.Value,
+                                    result: out object? folded))
                             {
-                                var c = new Const(res);
-                                env[bi.Dst.Id] = c;
-                                newIns.Add(
+                                var constant = new Const(folded);
+                                valueEnvironment[binaryInstruction.Dst.Id] = constant;
+                                rewrittenInstructions.Add(
                                     new Move(
-                                        Dst: bi.Dst,
-                                        Src: c));
+                                        Dst: binaryInstruction.Dst,
+                                        Src: constant));
                             }
                             else
                             {
-                                // use propagated operands
-                                newIns.Add(
+                                // Use propagated operands
+                                rewrittenInstructions.Add(
                                     new Bin(
-                                        Dst: bi.Dst,
-                                        Op: bi.Op,
-                                        L: l,
-                                        R: r));
+                                        Dst: binaryInstruction.Dst,
+                                        Op: binaryInstruction.Op,
+                                        L: left,
+                                        R: right));
 
-                                // dst gets a fresh unknown value, forget previous binding
-                                env.Remove(bi.Dst.Id);
+                                // Destination now holds a fresh unknown value, forget previous binding
+                                valueEnvironment.Remove(binaryInstruction.Dst.Id);
                             }
 
                             break;
                         }
 
-                    case Un un:
+                    case Un unaryInstruction:
                         {
-                            MOperand x = Resolve(
-                                env: env,
-                                op: un.X);
+                            MOperand operand = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: unaryInstruction.X);
 
-                            if (x is Const xc && TryEvalUn(
-                                    op: un.Op,
-                                    x: xc.Value,
-                                    res: out object? res))
+                            if (operand is Const constOperand &&
+                                TryEvaluateUnaryConst(
+                                    op: unaryInstruction.Op,
+                                    value: constOperand.Value,
+                                    result: out object? folded))
                             {
-                                var c = new Const(res);
-                                env[un.Dst.Id] = c;
-                                newIns.Add(
+                                var constant = new Const(folded);
+                                valueEnvironment[unaryInstruction.Dst.Id] = constant;
+                                rewrittenInstructions.Add(
                                     new Move(
-                                        Dst: un.Dst,
-                                        Src: c));
+                                        Dst: unaryInstruction.Dst,
+                                        Src: constant));
                             }
                             else
                             {
-                                newIns.Add(
+                                rewrittenInstructions.Add(
                                     new Un(
-                                        Dst: un.Dst,
-                                        Op: un.Op,
-                                        X: x));
+                                        Dst: unaryInstruction.Dst,
+                                        Op: unaryInstruction.Op,
+                                        X: operand));
 
-                                env.Remove(un.Dst.Id);
+                                valueEnvironment.Remove(unaryInstruction.Dst.Id);
                             }
 
                             break;
                         }
 
-                    case LoadIndex li:
+                    case LoadIndex loadIndexInstruction:
                         {
-                            MOperand arr = Resolve(
-                                env: env,
-                                op: li.Arr);
+                            MOperand arrayOperand = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: loadIndexInstruction.Arr);
 
-                            MOperand idx = Resolve(
-                                env: env,
-                                op: li.Index);
+                            MOperand indexOperand = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: loadIndexInstruction.Index);
 
-                            newIns.Add(
+                            rewrittenInstructions.Add(
                                 new LoadIndex(
-                                    Dst: li.Dst,
-                                    Arr: arr,
-                                    Index: idx));
+                                    Dst: loadIndexInstruction.Dst,
+                                    Arr: arrayOperand,
+                                    Index: indexOperand));
 
-                            env.Remove(li.Dst.Id);
+                            valueEnvironment.Remove(loadIndexInstruction.Dst.Id);
 
                             break;
                         }
 
-                    case StoreIndex si:
+                    case StoreIndex storeIndexInstruction:
                         {
-                            MOperand arr = Resolve(
-                                env: env,
-                                op: si.Arr);
+                            MOperand arrayOperand = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: storeIndexInstruction.Arr);
 
-                            MOperand idx = Resolve(
-                                env: env,
-                                op: si.Index);
+                            MOperand indexOperand = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: storeIndexInstruction.Index);
 
-                            MOperand val = Resolve(
-                                env: env,
-                                op: si.Value);
+                            MOperand valueOperand = ResolveOperand(
+                                environment: valueEnvironment,
+                                operand: storeIndexInstruction.Value);
 
-                            newIns.Add(
+                            rewrittenInstructions.Add(
                                 new StoreIndex(
-                                    Arr: arr,
-                                    Index: idx,
-                                    Value: val));
+                                    Arr: arrayOperand,
+                                    Index: indexOperand,
+                                    Value: valueOperand));
 
                             break;
                         }
 
-                    case Call cl:
+                    case Call callInstruction:
                         {
-                            var args = new List<MOperand>(cl.Args.Count);
+                            var resolvedArgs = new List<MOperand>(callInstruction.Args.Count);
 
-                            foreach (MOperand a in cl.Args)
+                            foreach (MOperand argument in callInstruction.Args)
                             {
-                                args.Add(
-                                    Resolve(
-                                        env: env,
-                                        op: a));
+                                resolvedArgs.Add(
+                                    ResolveOperand(
+                                        environment: valueEnvironment,
+                                        operand: argument));
                             }
 
-                            newIns.Add(
+                            rewrittenInstructions.Add(
                                 new Call(
-                                    Dst: cl.Dst,
-                                    Callee: cl.Callee,
-                                    Args: args));
+                                    Dst: callInstruction.Dst,
+                                    Callee: callInstruction.Callee,
+                                    Args: resolvedArgs));
 
-                            if (cl.Dst is not null)
+                            if (callInstruction.Dst is not null)
                             {
-                                env.Remove(cl.Dst.Id);
+                                valueEnvironment.Remove(callInstruction.Dst.Id);
                             }
 
                             break;
                         }
 
                     default:
-                        newIns.Add(ins);
+                        rewrittenInstructions.Add(instruction);
 
                         break;
                 }
             }
 
-            b.Instructions.Clear();
-            b.Instructions.AddRange(newIns);
+            basicBlock.Instructions.Clear();
+            basicBlock.Instructions.AddRange(rewrittenInstructions);
 
-            // Terminator simplification: BrCond with const bool
-            if (b.Terminator is BrCond bc)
+            // Terminator simplification: BrCond with constant bool
+            if (basicBlock.Terminator is BrCond brCond)
             {
-                MOperand cond = ResolveFromVRegOnly(
-                    op: bc.Cond,
-                    env: env);
+                MOperand condition = ResolveFromRegisterOnly(
+                    op: brCond.Cond,
+                    environment: valueEnvironment);
 
-                if (cond is Const c && c.Value is bool bb)
+                if (condition is Const constant && constant.Value is bool boolean)
                 {
-                    b.Terminator = new Br(
-                        bb
-                            ? bc.IfTrue
-                            : bc.IfFalse);
+                    basicBlock.Terminator = new Br(
+                        boolean
+                            ? brCond.IfTrue
+                            : brCond.IfFalse);
                 }
             }
         }
     }
 
-    private static bool IsConstCmpSupported(
-        object? l,
-        object? r)
+    private static bool IsSupportedConstantComparison(
+        object? left,
+        object? right)
     {
-        if (l is null || r is null)
+        if (left is null || right is null)
         {
             return true;
         }
 
-        Type tl = l.GetType();
-        Type tr = r.GetType();
+        Type leftType = left.GetType();
+        Type rightType = right.GetType();
 
-        if (tl != tr)
+        if (leftType != rightType)
         {
             return false;
         }
 
-        return tl == typeof(long) || tl == typeof(bool) || tl == typeof(char) || tl == typeof(string);
-    }
-
-    private static MOperand Resolve(
-        Dictionary<int, MOperand> env,
-        MOperand op)
-    {
-        if (op is VReg v && env.TryGetValue(
-                key: v.Id,
-                value: out MOperand? mapped))
-        {
-            return mapped;
-        }
-
-        return op;
+        return leftType == typeof(long) || leftType == typeof(bool) || leftType == typeof(char) || leftType == typeof(string);
     }
 
     // For terminators we only consider direct VReg -> Const mapping (no deep chains),
     // because side effects across blocks are not tracked here.
-    private static MOperand ResolveFromVRegOnly(
+    private static MOperand ResolveFromRegisterOnly(
         MOperand op,
-        Dictionary<int, MOperand> env)
+        Dictionary<int, MOperand> environment)
     {
-        return op is VReg v && env.TryGetValue(
-            key: v.Id,
+        return op is VReg register && environment.TryGetValue(
+            key: register.Id,
             value: out MOperand? mapped)
             ? mapped
             : op;
     }
 
-    private static bool TryEvalBin(
-        MBinOp op,
-        object? l,
-        object? r,
-        out object? res)
+    private static MOperand ResolveOperand(
+        Dictionary<int, MOperand> environment,
+        MOperand operand)
     {
-        res = null;
+        if (operand is VReg register && environment.TryGetValue(
+                key: register.Id,
+                value: out MOperand? mapped))
+        {
+            return mapped;
+        }
+
+        return operand;
+    }
+
+    private static bool TryEvaluateBinaryConst(
+        MBinOp op,
+        object? leftValue,
+        object? rightValue,
+        out object? result)
+    {
+        result = null;
 
         switch (op)
         {
             // integer arithmetic
             case MBinOp.Add:
-                if (l is long la && r is long ra)
+                if (leftValue is long addL && rightValue is long addR)
                 {
-                    res = la + ra;
+                    result = addL + addR;
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Sub:
-                if (l is long ls && r is long rs)
+                if (leftValue is long subL && rightValue is long subR)
                 {
-                    res = ls - rs;
+                    result = subL - subR;
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Mul:
-                if (l is long lm && r is long rm)
+                if (leftValue is long mulLft && rightValue is long mulRgt)
                 {
-                    res = lm * rm;
+                    result = mulLft * mulRgt;
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Div:
-                if (l is long ld && r is long rd && rd != 0)
+                if (leftValue is long divL && rightValue is long divR && divR != 0)
                 {
-                    res = ld / rd;
+                    result = divL / divR;
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Mod:
-                if (l is long lq && r is long rq && rq != 0)
+                if (leftValue is long modL && rightValue is long modR && modR != 0)
                 {
-                    res = lq % rq;
+                    result = modL % modR;
 
                     return true;
                 }
@@ -333,62 +335,62 @@ public sealed class MirSimplifier
 
             // comparisons
             case MBinOp.Eq:
-                if (IsConstCmpSupported(
-                        l: l,
-                        r: r))
+                if (IsSupportedConstantComparison(
+                        left: leftValue,
+                        right: rightValue))
                 {
-                    res = Equals(
-                        objA: l,
-                        objB: r);
+                    result = Equals(
+                        objA: leftValue,
+                        objB: rightValue);
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Ne:
-                if (IsConstCmpSupported(
-                        l: l,
-                        r: r))
+                if (IsSupportedConstantComparison(
+                        left: leftValue,
+                        right: rightValue))
                 {
-                    res = !Equals(
-                        objA: l,
-                        objB: r);
+                    result = !Equals(
+                        objA: leftValue,
+                        objB: rightValue);
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Lt:
-                if (l is long l1 && r is long r1)
+                if (leftValue is long ltL && rightValue is long ltR)
                 {
-                    res = l1 < r1;
+                    result = ltL < ltR;
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Le:
-                if (l is long l2 && r is long r2)
+                if (leftValue is long leL && rightValue is long leR)
                 {
-                    res = l2 <= r2;
+                    result = leL <= leR;
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Gt:
-                if (l is long l3 && r is long r3)
+                if (leftValue is long gtL && rightValue is long gtR)
                 {
-                    res = l3 > r3;
+                    result = gtL > gtR;
 
                     return true;
                 }
 
                 return false;
             case MBinOp.Ge:
-                if (l is long l4 && r is long r4)
+                if (leftValue is long geL && rightValue is long geR)
                 {
-                    res = l4 >= r4;
+                    result = geL >= geR;
 
                     return true;
                 }
@@ -400,37 +402,37 @@ public sealed class MirSimplifier
         }
     }
 
-    private static bool TryEvalUn(
+    private static bool TryEvaluateUnaryConst(
         MUnOp op,
-        object? x,
-        out object? res)
+        object? value,
+        out object? result)
     {
-        res = null;
+        result = null;
 
         switch (op)
         {
             case MUnOp.Plus:
-                if (x is long lx)
+                if (value is long plus)
                 {
-                    res = +lx;
+                    result = +plus;
 
                     return true;
                 }
 
                 return false;
             case MUnOp.Neg:
-                if (x is long nx)
+                if (value is long neg)
                 {
-                    res = -nx;
+                    result = -neg;
 
                     return true;
                 }
 
                 return false;
             case MUnOp.Not:
-                if (x is bool bx)
+                if (value is bool boolean)
                 {
-                    res = !bx;
+                    result = !boolean;
 
                     return true;
                 }

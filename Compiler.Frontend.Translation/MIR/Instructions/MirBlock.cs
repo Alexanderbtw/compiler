@@ -2,17 +2,12 @@ using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 
 namespace Compiler.Frontend.Translation.MIR.Instructions;
 
-public sealed class MirBlock
+public sealed class MirBlock(
+    string name)
 {
-    public MirBlock(
-        string name)
-    {
-        Name = name;
-    }
-
     public List<MirInstr> Instructions { get; } = [];
 
-    public string Name { get; }
+    public string Name { get; } = name;
 
     public MirInstr? Terminator { get; set; }
 

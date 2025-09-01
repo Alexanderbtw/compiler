@@ -19,7 +19,7 @@ public sealed class MirToBytecode
     {
         var vmModule = new VmModule();
 
-        // Сначала регистрируем все функции, чтобы знать их индексы заранее
+        // Сначала регистрируем все функции, чтобы заранее знать их индексы
         foreach (MirFunction mirFunction in mirModule.Functions)
         {
             vmModule.AddFunction(
@@ -46,26 +46,26 @@ public sealed class MirToBytecode
         VmModule vmModule)
     {
         // Отображение виртуальных регистров MIR в локальные индексы VM
-        var vregToLocalIndex = new Dictionary<int, int>();
+        var virtualRegisterToLocalIndex = new Dictionary<int, int>();
 
         int AllocateNextLocalIndex() =>
-            vregToLocalIndex.Count;
+            virtualRegisterToLocalIndex.Count;
 
         // Параметры функции → локальные слоты (в порядке ParamRegs)
-        foreach (VReg paramVReg in mirFunction.ParamRegs)
+        foreach (VReg parameterRegister in mirFunction.ParamRegs)
         {
-            if (!vregToLocalIndex.ContainsKey(paramVReg.Id))
+            if (!virtualRegisterToLocalIndex.ContainsKey(parameterRegister.Id))
             {
-                vregToLocalIndex[paramVReg.Id] = AllocateNextLocalIndex();
+                virtualRegisterToLocalIndex[parameterRegister.Id] = AllocateNextLocalIndex();
             }
 
-            vmFunction.ParamLocalIndices.Add(vregToLocalIndex[paramVReg.Id]);
+            vmFunction.ParamLocalIndices.Add(virtualRegisterToLocalIndex[parameterRegister.Id]);
         }
 
         List<Instr> instructions = vmFunction.Code;
         var blockToInstructionIndex = new Dictionary<MirBlock, int>();
-        var pendingUnconditionalBranchFixups = new List<(int pc, MirBlock target)>();
-        var pendingConditionalBranchFixups = new List<(int pcTrue, MirBlock trueBlock, int pcFalse, MirBlock falseBlock)>();
+        var pendingUnconditionalBranchPatches = new List<(int instructionIndex, MirBlock targetBlock)>();
+        var pendingConditionalBranchPatches = new List<(int truePatchIndex, MirBlock trueBlock, int falsePatchIndex, MirBlock falseBlock)>();
 
         // Локальные помощники загрузки/сохранения операндов
         void EmitLoadOperand(
@@ -99,8 +99,8 @@ public sealed class MirToBytecode
 
                             break;
                         case string text:
-                            int stringId = vmModule.AddString(text);
-                            instructions.Add(new Instr { Op = OpCode.LdcStr, Idx = stringId });
+                            int stringPoolIndex = vmModule.AddString(text);
+                            instructions.Add(new Instr { Op = OpCode.LdcStr, Idx = stringPoolIndex });
 
                             break;
                         default:
@@ -109,13 +109,13 @@ public sealed class MirToBytecode
 
                     break;
 
-                case VReg vreg:
-                    if (!vregToLocalIndex.TryGetValue(
-                            key: vreg.Id,
+                case VReg virtualRegister:
+                    if (!virtualRegisterToLocalIndex.TryGetValue(
+                            key: virtualRegister.Id,
                             value: out int localIndex))
                     {
                         localIndex = AllocateNextLocalIndex();
-                        vregToLocalIndex[vreg.Id] = localIndex;
+                        virtualRegisterToLocalIndex[virtualRegister.Id] = localIndex;
                     }
 
                     instructions.Add(new Instr { Op = OpCode.LdLoc, A = localIndex });
@@ -132,12 +132,12 @@ public sealed class MirToBytecode
         void EmitStoreToDestination(
             VReg destination)
         {
-            if (!vregToLocalIndex.TryGetValue(
+            if (!virtualRegisterToLocalIndex.TryGetValue(
                     key: destination.Id,
                     value: out int localIndex))
             {
                 localIndex = AllocateNextLocalIndex();
-                vregToLocalIndex[destination.Id] = localIndex;
+                virtualRegisterToLocalIndex[destination.Id] = localIndex;
             }
 
             instructions.Add(new Instr { Op = OpCode.StLoc, A = localIndex });
@@ -276,8 +276,8 @@ public sealed class MirToBytecode
                             }
                             else
                             {
-                                int builtinNameId = vmModule.AddString(call.Callee);
-                                instructions.Add(new Instr { Op = OpCode.CallBuiltin, A = builtinNameId, B = call.Args.Count });
+                                int builtinNameStringIndex = vmModule.AddString(call.Callee);
+                                instructions.Add(new Instr { Op = OpCode.CallBuiltin, A = builtinNameStringIndex, B = call.Args.Count });
                             }
 
                             if (call.Dst is null)
@@ -330,9 +330,9 @@ public sealed class MirToBytecode
 
                     case Br branchTerminator:
                         {
-                            int patchSite = instructions.Count;
+                            int branchPlaceholderIndex = instructions.Count;
                             instructions.Add(new Instr { Op = OpCode.Br, A = -1 });
-                            pendingUnconditionalBranchFixups.Add((patchSite, branchTerminator.Target));
+                            pendingUnconditionalBranchPatches.Add((branchPlaceholderIndex, branchTerminator.Target));
 
                             break;
                         }
@@ -340,11 +340,11 @@ public sealed class MirToBytecode
                     case BrCond condTerminator:
                         {
                             EmitLoadOperand(condTerminator.Cond);
-                            int patchSiteTrue = instructions.Count;
+                            int trueBranchPlaceholderIndex = instructions.Count;
                             instructions.Add(new Instr { Op = OpCode.BrTrue, A = -1 });
-                            int patchSiteFalse = instructions.Count;
+                            int falseBranchPlaceholderIndex = instructions.Count;
                             instructions.Add(new Instr { Op = OpCode.Br, A = -1 });
-                            pendingConditionalBranchFixups.Add((patchSiteTrue, condTerminator.IfTrue, patchSiteFalse, condTerminator.IfFalse));
+                            pendingConditionalBranchPatches.Add((trueBranchPlaceholderIndex, condTerminator.IfTrue, falseBranchPlaceholderIndex, condTerminator.IfFalse));
 
                             break;
                         }
@@ -358,17 +358,17 @@ public sealed class MirToBytecode
         }
 
         // Починить адреса переходов после того, как все блоки получили адреса
-        foreach ((int pc, MirBlock targetBlock) in pendingUnconditionalBranchFixups)
+        foreach ((int instructionIndex, MirBlock targetBlock) in pendingUnconditionalBranchPatches)
         {
-            vmFunction.Code[pc] = vmFunction.Code[pc] with { A = blockToInstructionIndex[targetBlock] };
+            vmFunction.Code[instructionIndex] = vmFunction.Code[instructionIndex] with { A = blockToInstructionIndex[targetBlock] };
         }
 
-        foreach ((int pcTrue, MirBlock trueBlock, int pcFalse, MirBlock falseBlock) in pendingConditionalBranchFixups)
+        foreach ((int truePatchIndex, MirBlock trueBlock, int falsePatchIndex, MirBlock falseBlock) in pendingConditionalBranchPatches)
         {
-            vmFunction.Code[pcTrue] = vmFunction.Code[pcTrue] with { A = blockToInstructionIndex[trueBlock] };
-            vmFunction.Code[pcFalse] = vmFunction.Code[pcFalse] with { A = blockToInstructionIndex[falseBlock] };
+            vmFunction.Code[truePatchIndex] = vmFunction.Code[truePatchIndex] with { A = blockToInstructionIndex[trueBlock] };
+            vmFunction.Code[falsePatchIndex] = vmFunction.Code[falsePatchIndex] with { A = blockToInstructionIndex[falseBlock] };
         }
 
-        vmFunction.NLocals = vregToLocalIndex.Count;
+        vmFunction.NLocals = virtualRegisterToLocalIndex.Count;
     }
 }

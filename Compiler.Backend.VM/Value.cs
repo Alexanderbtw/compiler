@@ -4,13 +4,13 @@ public enum ValueTag { Null, I64, Bool, Char, String, Array, Object }
 
 public readonly struct Value
 {
-    public readonly bool B;
-    public readonly char C;
-    public readonly long I64;
+    public readonly bool Bool;
+    public readonly char Char;
+    public readonly long Int64;
 
     public static readonly Value Null = new Value(
         tag: ValueTag.Null,
-        i64: 0,
+        int64: 0,
         b: false,
         c: '\0',
         r: null);
@@ -20,18 +20,18 @@ public readonly struct Value
 
     private Value(
         ValueTag tag,
-        long i64,
+        long int64,
         bool b,
         char c,
         object? r)
     {
         Tag = tag;
-        I64 = i64;
-        B = b;
-        C = c;
+        Int64 = int64;
+        Bool = b;
+        Char = c;
         Ref = r;
     }
-    public VmArray AsArr()
+    public VmArray AsArray()
     {
         return Tag == ValueTag.Array
             ? (VmArray)Ref!
@@ -41,24 +41,24 @@ public readonly struct Value
     public bool AsBool()
     {
         return Tag == ValueTag.Bool
-            ? B
+            ? Bool
             : throw new InvalidOperationException("not bool");
     }
 
     public char AsChar()
     {
         return Tag == ValueTag.Char
-            ? C
+            ? Char
             : throw new InvalidOperationException("not char");
     }
 
-    public long AsLong()
+    public long AsInt64()
     {
         return Tag == ValueTag.I64
-            ? I64
+            ? Int64
             : throw new InvalidOperationException("not i64");
     }
-    public string AsStr()
+    public string AsString()
     {
         return Tag == ValueTag.String
             ? (string)Ref!
@@ -70,7 +70,7 @@ public readonly struct Value
     {
         return new Value(
             tag: ValueTag.Array,
-            i64: 0,
+            int64: 0,
             b: false,
             c: '\0',
             r: a);
@@ -81,7 +81,7 @@ public readonly struct Value
     {
         return new Value(
             tag: ValueTag.Bool,
-            i64: 0,
+            int64: 0,
             b: x,
             c: '\0',
             r: null);
@@ -92,7 +92,7 @@ public readonly struct Value
     {
         return new Value(
             tag: ValueTag.Char,
-            i64: 0,
+            int64: 0,
             b: false,
             c: x,
             r: null);
@@ -103,7 +103,7 @@ public readonly struct Value
     {
         return new Value(
             tag: ValueTag.I64,
-            i64: x,
+            int64: x,
             b: false,
             c: '\0',
             r: null);
@@ -122,7 +122,7 @@ public readonly struct Value
             int n => FromLong(n),
             _ => new Value(
                 tag: ValueTag.Object,
-                i64: 0,
+                int64: 0,
                 b: false,
                 c: '\0',
                 r: o)
@@ -134,7 +134,7 @@ public readonly struct Value
     {
         return new Value(
             tag: ValueTag.String,
-            i64: 0,
+            int64: 0,
             b: false,
             c: '\0',
             r: s);
@@ -145,11 +145,11 @@ public readonly struct Value
         return Tag switch
         {
             ValueTag.Null => "null",
-            ValueTag.I64 => I64.ToString(),
-            ValueTag.Bool => B
+            ValueTag.I64 => Int64.ToString(),
+            ValueTag.Bool => Bool
                 ? "true"
                 : "false",
-            ValueTag.Char => C.ToString(),
+            ValueTag.Char => Char.ToString(),
             ValueTag.String => (string)Ref!,
             ValueTag.Array => "[array]",
             _ => Ref?.ToString() ?? "null"

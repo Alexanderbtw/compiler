@@ -5,133 +5,163 @@ using Compiler.Frontend.Translation.MIR.Operands;
 
 namespace Compiler.Frontend.Translation.MIR;
 
-/// Минимальная типизация для ускорения IL: i64-арифметика, булевы сравнения/логика, char-константы.
+/// <summary>
+///     Minimal type inference pass for MIR to help IL generation:
+///     - arithmetic on i64,
+///     - boolean results for comparisons and logical NOT,
+///     - char for char-constants,
+///     - everything else defaults to Obj.
+/// </summary>
 public sealed class MirTypeAnnotator
 {
     public void Annotate(
-        MirModule m)
+        MirModule mirModule)
     {
-        foreach (MirFunction f in m.Functions)
+        foreach (MirFunction function in mirModule.Functions)
         {
-            Annotate(f);
+            Annotate(function);
         }
     }
 
     public void Annotate(
-        MirFunction f)
+        MirFunction function)
     {
-        // Параметры по умолчанию — Obj (можно расширить позже)
-        foreach (VReg vr in f.ParamRegs)
+        // Function parameters: default to Obj (can be refined later)
+        foreach (VReg parameterRegister in function.ParamRegs)
         {
-            SetIfEmpty(
-                f: f,
-                v: vr,
-                t: MirFunction.MType.Obj);
+            SetTypeIfEmpty(
+                function: function,
+                register: parameterRegister,
+                type: MirFunction.MType.Obj);
         }
 
-        bool changed;
-        int guard = 0;
+        bool hasChanged;
+        int iterationCount = 0;
+        const int maxIterations = 50; // safety guard to avoid infinite loops
 
         do
         {
-            changed = false;
-            guard++;
+            hasChanged = false;
+            iterationCount++;
 
-            if (guard > 50)
+            if (iterationCount > maxIterations)
             {
-                break; // safety
+                break;
             }
 
-            foreach (MirBlock b in f.Blocks)
-            foreach (MirInstr i in b.Instructions)
+            foreach (MirBlock block in function.Blocks)
             {
-                switch (i)
+                foreach (MirInstr instruction in block.Instructions)
                 {
-                    case Move mv:
-                        changed |= Merge(
-                            f: f,
-                            dst: mv.Dst,
-                            t: TypeOfOperand(
-                                f: f,
-                                op: mv.Src));
+                    switch (instruction)
+                    {
+                        case Move move:
+                            hasChanged |= MergeType(
+                                function: function,
+                                destination: move.Dst,
+                                targetType: GetOperandType(
+                                    function: function,
+                                    operand: move.Src));
 
-                        break;
+                            break;
 
-                    case Bin bi:
-                        if (IsI64Arith(bi.Op))
-                        {
-                            changed |= Merge(
-                                f: f,
-                                dst: bi.Dst,
-                                t: MirFunction.MType.I64);
-                        }
-                        else if (IsCmp(bi.Op))
-                        {
-                            changed |= Merge(
-                                f: f,
-                                dst: bi.Dst,
-                                t: MirFunction.MType.Bool);
-                        }
-                        else
-                        {
-                            changed |= Merge(
-                                f: f,
-                                dst: bi.Dst,
-                                t: MirFunction.MType.Obj);
-                        }
+                        case Bin binary:
+                            if (IsI64ArithmeticBinaryOp(binary.Op))
+                            {
+                                hasChanged |= MergeType(
+                                    function: function,
+                                    destination: binary.Dst,
+                                    targetType: MirFunction.MType.I64);
+                            }
+                            else if (IsComparisonBinaryOp(binary.Op))
+                            {
+                                hasChanged |= MergeType(
+                                    function: function,
+                                    destination: binary.Dst,
+                                    targetType: MirFunction.MType.Bool);
+                            }
+                            else
+                            {
+                                hasChanged |= MergeType(
+                                    function: function,
+                                    destination: binary.Dst,
+                                    targetType: MirFunction.MType.Obj);
+                            }
 
-                        break;
+                            break;
 
-                    case Un un:
-                        if (un.Op is MUnOp.Neg or MUnOp.Plus)
-                        {
-                            changed |= Merge(
-                                f: f,
-                                dst: un.Dst,
-                                t: MirFunction.MType.I64);
-                        }
-                        else if (un.Op is MUnOp.Not)
-                        {
-                            changed |= Merge(
-                                f: f,
-                                dst: un.Dst,
-                                t: MirFunction.MType.Bool);
-                        }
-                        else
-                        {
-                            changed |= Merge(
-                                f: f,
-                                dst: un.Dst,
-                                t: MirFunction.MType.Obj);
-                        }
+                        case Un unary:
+                            if (unary.Op is MUnOp.Neg or MUnOp.Plus)
+                            {
+                                hasChanged |= MergeType(
+                                    function: function,
+                                    destination: unary.Dst,
+                                    targetType: MirFunction.MType.I64);
+                            }
+                            else if (unary.Op is MUnOp.Not)
+                            {
+                                hasChanged |= MergeType(
+                                    function: function,
+                                    destination: unary.Dst,
+                                    targetType: MirFunction.MType.Bool);
+                            }
+                            else
+                            {
+                                hasChanged |= MergeType(
+                                    function: function,
+                                    destination: unary.Dst,
+                                    targetType: MirFunction.MType.Obj);
+                            }
 
-                        break;
+                            break;
 
-                    case LoadIndex li:
-                        changed |= Merge(
-                            f: f,
-                            dst: li.Dst,
-                            t: MirFunction.MType.Obj);
+                        case LoadIndex loadIndex:
+                            // Unknown element type at this pass → Obj
+                            hasChanged |= MergeType(
+                                function: function,
+                                destination: loadIndex.Dst,
+                                targetType: MirFunction.MType.Obj);
 
-                        break;
+                            break;
 
-                    case Call cl:
-                        changed |= Merge(
-                            f: f,
-                            dst: cl.Dst,
-                            t: GuessCallReturnType(cl.Callee));
+                        case Call call:
+                            hasChanged |= MergeType(
+                                function: function,
+                                destination: call.Dst,
+                                targetType: GuessCalleeReturnType(call.Callee));
 
-                        break;
+                            break;
+                    }
                 }
             }
         }
-        while (changed);
+        while (hasChanged);
     }
 
-    private static MirFunction.MType GuessCallReturnType(
-        string callee)
+    private static MirFunction.MType GetOperandType(
+        MirFunction function,
+        MOperand? operand)
     {
-        return callee switch
+        return operand switch
+        {
+            VReg vreg => function.Types.GetValueOrDefault(
+                key: vreg.Id,
+                defaultValue: MirFunction.MType.Obj),
+            Const constant => constant.Value switch
+            {
+                long => MirFunction.MType.I64,
+                bool => MirFunction.MType.Bool,
+                char => MirFunction.MType.Char,
+                _ => MirFunction.MType.Obj
+            },
+            _ => MirFunction.MType.Obj
+        };
+    }
+
+    private static MirFunction.MType GuessCalleeReturnType(
+        string calleeName)
+    {
+        return calleeName switch
         {
             "len" => MirFunction.MType.I64,
             "ord" => MirFunction.MType.I64,
@@ -142,48 +172,54 @@ public sealed class MirTypeAnnotator
             _ => MirFunction.MType.Obj
         };
     }
-    private static bool IsCmp(
+
+    private static bool IsComparisonBinaryOp(
         MBinOp op)
     {
         return op is MBinOp.Lt or MBinOp.Le or MBinOp.Gt or MBinOp.Ge or MBinOp.Eq or MBinOp.Ne;
     }
 
-    private static bool IsI64Arith(
+    private static bool IsI64ArithmeticBinaryOp(
         MBinOp op)
     {
         return op is MBinOp.Add or MBinOp.Sub or MBinOp.Mul or MBinOp.Div or MBinOp.Mod;
     }
 
-    private static bool Merge(
-        MirFunction f,
-        VReg? dst,
-        MirFunction.MType t)
+    private static bool MergeType(
+        MirFunction function,
+        VReg? destination,
+        MirFunction.MType targetType)
     {
-        if (dst is null)
+        if (destination is null)
         {
             return false;
         }
 
-        if (!f.Types.TryGetValue(
-                key: dst.Id,
-                value: out MirFunction.MType cur))
+        if (!function.Types.TryGetValue(
+                key: destination.Id,
+                value: out MirFunction.MType currentType))
         {
-            f.Types[dst.Id] = t;
+            function.Types[destination.Id] = targetType;
 
             return true;
         }
 
-        if (cur == t)
+        if (currentType == targetType)
         {
             return false;
         }
 
-        // Упрощённое расширение: любой конфликт → Obj
-        MirFunction.MType widened = cur == MirFunction.MType.Obj || t == MirFunction.MType.Obj ? MirFunction.MType.Obj : cur == t ? cur : MirFunction.MType.Obj;
+        // Simplified widening: any conflict widens to Obj
+        MirFunction.MType widened =
+            currentType == MirFunction.MType.Obj || targetType == MirFunction.MType.Obj
+                ? MirFunction.MType.Obj
+                : currentType == targetType
+                    ? currentType
+                    : MirFunction.MType.Obj;
 
-        if (widened != cur)
+        if (widened != currentType)
         {
-            f.Types[dst.Id] = widened;
+            function.Types[destination.Id] = widened;
 
             return true;
         }
@@ -191,30 +227,13 @@ public sealed class MirTypeAnnotator
         return false;
     }
 
-    private static void SetIfEmpty(
-        MirFunction f,
-        VReg? v,
-        MirFunction.MType t)
+    private static void SetTypeIfEmpty(
+        MirFunction function,
+        VReg? register,
+        MirFunction.MType type)
     {
-        f.Types.TryAdd(
-            key: v.Id,
-            value: t);
-    }
-
-    private static MirFunction.MType TypeOfOperand(
-        MirFunction f,
-        MOperand? op)
-    {
-        return op switch
-        {
-            VReg v => f.Types.GetValueOrDefault(
-                key: v.Id,
-                defaultValue: MirFunction.MType.Obj),
-            Const c => c.Value switch
-            {
-                long => MirFunction.MType.I64, bool => MirFunction.MType.Bool, char => MirFunction.MType.Char, _ => MirFunction.MType.Obj
-            },
-            _ => MirFunction.MType.Obj
-        };
+        function.Types.TryAdd(
+            key: register.Id,
+            value: type);
     }
 }
