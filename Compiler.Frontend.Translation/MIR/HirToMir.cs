@@ -13,453 +13,455 @@ namespace Compiler.Frontend.Translation.MIR;
 public sealed class HirToMir
 {
     public MirModule Lower(
-        ProgramHir prog)
+        ProgramHir program)
     {
-        var ctx = new Ctx();
+        var context = new LoweringContext();
 
-        foreach (FuncHir f in prog.Functions)
+        foreach (FuncHir functionHir in program.Functions)
         {
-            ctx.Mod.Functions.Add(
-                LowerFunc(
-                    ctx: ctx,
-                    f: f));
+            context.Module.Functions.Add(
+                LowerFunction(
+                    context: context,
+                    function: functionHir));
         }
 
-        return ctx.Mod;
+        return context.Module;
     }
 
-    private MOperand? LowerExpr(
-        Ctx ctx,
-        ExprHir e)
+    private MOperand LowerExpression(
+        LoweringContext context,
+        ExprHir expr)
     {
-        switch (e)
+        switch (expr)
         {
-            case IntHir i:
-                return new Const(i.Value);
-            case BoolHir b:
-                return new Const(b.Value);
-            case CharHir c:
-                return new Const(c.Value);
-            case StringHir s:
-                return new Const(s.Value);
+            case IntHir intLiteral:
+                return new Const(intLiteral.Value);
+            case BoolHir boolLiteral:
+                return new Const(boolLiteral.Value);
+            case CharHir charLiteral:
+                return new Const(charLiteral.Value);
+            case StringHir stringLiteral:
+                return new Const(stringLiteral.Value);
 
-            case VarHir v:
-                if (!ctx.TryGet(
-                        name: v.Name,
-                        vr: out VReg? reg))
+            case VarHir varExpr:
+                if (!context.TryGetVariableRegister(
+                        name: varExpr.Name,
+                        reg: out VReg? variableReg))
                 {
-                    throw new InvalidOperationException($"variable '{v.Name}' not in scope during MIR lowering");
+                    throw new InvalidOperationException($"variable '{varExpr.Name}' not in scope during MIR lowering");
                 }
 
-                return reg;
+                return variableReg!;
 
-            case UnHir u:
+            case UnHir unary:
                 {
-                    MOperand? x = LowerExpr(
-                        ctx: ctx,
-                        e: u.Operand);
+                    MOperand operand = LowerExpression(
+                        context: context,
+                        expr: unary.Operand);
 
-                    VReg? dst = ctx.F.NewTemp();
-                    ctx.Cur.Instructions.Add(
+                    VReg destination = context.CurrentFunction.NewTemp();
+                    context.CurrentBlock.Instructions.Add(
                         new Un(
-                            Dst: dst,
-                            Op: MapUn(u.Op),
-                            X: x));
+                            Dst: destination,
+                            Op: MapUn(unary.Op),
+                            X: operand));
 
-                    return dst;
+                    return destination;
                 }
 
-            case BinHir { Op: BinOp.Assign } b:
+            case BinHir { Op: BinOp.Assign } assignment:
                 {
-                    MOperand? rhs = LowerExpr(
-                        ctx: ctx,
-                        e: b.Right);
+                    MOperand rightValue = LowerExpression(
+                        context: context,
+                        expr: assignment.Right);
 
-                    switch (b.Left)
+                    switch (assignment.Left)
                     {
-                        case VarHir lv when ctx.TryGet(
-                            name: lv.Name,
-                            vr: out VReg? lreg):
-                            ctx.Cur.Instructions.Add(
+                        case VarHir leftVar when context.TryGetVariableRegister(
+                            name: leftVar.Name,
+                            reg: out VReg? leftReg):
+                            context.CurrentBlock.Instructions.Add(
                                 new Move(
-                                    Dst: lreg,
-                                    Src: rhs));
+                                    Dst: leftReg!,
+                                    Src: rightValue));
 
-                            return lreg;
-                        case IndexHir ix:
+                            return leftReg!;
+
+                        case IndexHir leftIndex:
                             {
-                                MOperand? arr = LowerExpr(
-                                    ctx: ctx,
-                                    e: ix.Target);
+                                MOperand arrayOperand = LowerExpression(
+                                    context: context,
+                                    expr: leftIndex.Target);
 
-                                MOperand? idx = LowerExpr(
-                                    ctx: ctx,
-                                    e: ix.Index);
+                                MOperand indexOperand = LowerExpression(
+                                    context: context,
+                                    expr: leftIndex.Index);
 
-                                ctx.Cur.Instructions.Add(
+                                context.CurrentBlock.Instructions.Add(
                                     new StoreIndex(
-                                        Arr: arr,
-                                        Index: idx,
-                                        Value: rhs));
+                                        Arr: arrayOperand,
+                                        Index: indexOperand,
+                                        Value: rightValue));
 
-                                return rhs;
+                                return rightValue;
                             }
+
                         default:
                             throw new NotSupportedException("assignment target not supported");
                     }
                 }
 
-            case BinHir { Op: BinOp.And or BinOp.Or } b:
-                return LowerShortCircuit(
-                    ctx: ctx,
-                    b: b);
+            case BinHir { Op: BinOp.And or BinOp.Or } shortCircuit:
+                return LowerShortCircuitBinary(
+                    context: context,
+                    bin: shortCircuit);
 
-            case BinHir b:
+            case BinHir binary:
                 {
-                    MOperand? l = LowerExpr(
-                        ctx: ctx,
-                        e: b.Left);
+                    MOperand leftOperand = LowerExpression(
+                        context: context,
+                        expr: binary.Left);
 
-                    MOperand? r = LowerExpr(
-                        ctx: ctx,
-                        e: b.Right);
+                    MOperand rightOperand = LowerExpression(
+                        context: context,
+                        expr: binary.Right);
 
-                    VReg? dst = ctx.F.NewTemp();
-                    ctx.Cur.Instructions.Add(
+                    VReg destination = context.CurrentFunction.NewTemp();
+                    context.CurrentBlock.Instructions.Add(
                         new Bin(
-                            Dst: dst,
-                            Op: MapBin(b.Op),
-                            L: l,
-                            R: r));
+                            Dst: destination,
+                            Op: MapBin(binary.Op),
+                            L: leftOperand,
+                            R: rightOperand));
 
-                    return dst;
+                    return destination;
                 }
 
-            case CallHir c:
+            case CallHir call:
                 {
-                    string name = (c.Callee as VarHir)?.Name
+                    string calleeName = (call.Callee as VarHir)?.Name
                         ?? throw new NotSupportedException("only simple function names are callable");
 
-                    List<MOperand> args = c
+                    List<MOperand> loweredArgs = call
                         .Args
-                        .Select(a => LowerExpr(
-                            ctx: ctx,
-                            e: a))
+                        .Select(a => LowerExpression(
+                            context: context,
+                            expr: a))
                         .ToList();
 
-                    VReg? dst = ctx.F.NewTemp();
-                    ctx.Cur.Instructions.Add(
+                    VReg destination = context.CurrentFunction.NewTemp();
+                    context.CurrentBlock.Instructions.Add(
                         new Call(
-                            Dst: dst,
-                            Callee: name,
-                            Args: args));
+                            Dst: destination,
+                            Callee: calleeName,
+                            Args: loweredArgs));
 
-                    return dst;
+                    return destination;
                 }
 
-            case IndexHir ix:
+            case IndexHir indexExpr:
                 {
-                    MOperand? arr = LowerExpr(
-                        ctx: ctx,
-                        e: ix.Target);
+                    MOperand arrayOperand = LowerExpression(
+                        context: context,
+                        expr: indexExpr.Target);
 
-                    MOperand? idx = LowerExpr(
-                        ctx: ctx,
-                        e: ix.Index);
+                    MOperand indexOperand = LowerExpression(
+                        context: context,
+                        expr: indexExpr.Index);
 
-                    VReg? dst = ctx.F.NewTemp();
-                    ctx.Cur.Instructions.Add(
+                    VReg destination = context.CurrentFunction.NewTemp();
+                    context.CurrentBlock.Instructions.Add(
                         new LoadIndex(
-                            Dst: dst,
-                            Arr: arr,
-                            Index: idx));
+                            Dst: destination,
+                            Arr: arrayOperand,
+                            Index: indexOperand));
 
-                    return dst;
+                    return destination;
                 }
 
             default:
-                throw new NotSupportedException($"Expr {e.GetType().Name} not supported in MIR lowering");
+                throw new NotSupportedException($"Expr {expr.GetType().Name} not supported in MIR lowering");
         }
     }
 
-    private MirFunction LowerFunc(
-        Ctx ctx,
-        FuncHir f)
+    private MirFunction LowerFunction(
+        LoweringContext context,
+        FuncHir function)
     {
-        ctx.F = new MirFunction(f.Name);
-        ctx.Cur = ctx.F.NewBlock("entry");
+        context.CurrentFunction = new MirFunction(function.Name);
+        context.CurrentBlock = context.CurrentFunction.NewBlock("entry");
 
-        ctx.PushScope();
+        context.PushScope();
 
-        foreach (string p in f.Parameters)
+        foreach (string parameterName in function.Parameters)
         {
-            VReg? vr = ctx.Def(p);
-            ctx.F.ParamNames.Add(p);
-            ctx.F.ParamRegs.Add(vr);
+            VReg parameterReg = context.DefineVariable(parameterName);
+            context.CurrentFunction.ParamNames.Add(parameterName);
+            context.CurrentFunction.ParamRegs.Add(parameterReg);
         }
 
-        LowerStmt(
-            ctx: ctx,
-            s: f.Body);
+        LowerStatement(
+            context: context,
+            stmt: function.Body);
 
-        // гарантируем терминатор
-        if (ctx.Cur.Terminator is null)
+        // Гарантируем, что у последнего активного блока есть терминатор
+        if (context.CurrentBlock.Terminator is null)
         {
-            ctx.Cur.Terminator = new Ret(null);
+            context.CurrentBlock.Terminator = new Ret(null);
         }
 
-        ctx.PopScope();
+        context.PopScope();
 
-        return ctx.F;
+        return context.CurrentFunction;
     }
 
-    private MOperand? LowerShortCircuit(
-        Ctx ctx,
-        BinHir b)
+    private MOperand LowerShortCircuitBinary(
+        LoweringContext context,
+        BinHir bin)
     {
-        VReg? result = ctx.F.NewTemp();
+        VReg resultTemp = context.CurrentFunction.NewTemp();
 
-        MOperand? evalL = LowerExpr(
-            ctx: ctx,
-            e: b.Left);
+        MOperand leftEvaluated = LowerExpression(
+            context: context,
+            expr: bin.Left);
 
-        MirBlock rhsB = ctx.F.NewBlock($"sc_rhs_{ctx.F.Blocks.Count}");
-        MirBlock joinB = ctx.F.NewBlock($"sc_join_{ctx.F.Blocks.Count}");
-        MirBlock shortB = ctx.F.NewBlock($"sc_short_{ctx.F.Blocks.Count}");
+        MirBlock rightBlock = context.CurrentFunction.NewBlock($"sc_rhs_{context.CurrentFunction.Blocks.Count}");
+        MirBlock joinBlock = context.CurrentFunction.NewBlock($"sc_join_{context.CurrentFunction.Blocks.Count}");
+        MirBlock shortBlock = context.CurrentFunction.NewBlock($"sc_short_{context.CurrentFunction.Blocks.Count}");
 
-        if (b.Op == BinOp.And)
+        if (bin.Op == BinOp.And)
         {
             // if (!L) goto short; else goto rhs
-            ctx.Cur.Terminator = new BrCond(
-                Cond: evalL,
-                IfTrue: rhsB,
-                IfFalse: shortB);
+            context.CurrentBlock.Terminator = new BrCond(
+                Cond: leftEvaluated,
+                IfTrue: rightBlock,
+                IfFalse: shortBlock);
 
             // short: result = false
-            ctx.Cur = shortB;
-            ctx.Cur.Instructions.Add(
+            context.CurrentBlock = shortBlock;
+            context.CurrentBlock.Instructions.Add(
                 new Move(
-                    Dst: result,
+                    Dst: resultTemp,
                     Src: new Const(false)));
 
-            ctx.Cur.Terminator = new Br(joinB);
+            context.CurrentBlock.Terminator = new Br(joinBlock);
 
             // rhs: result = R
-            ctx.Cur = rhsB;
-            MOperand? r = LowerExpr(
-                ctx: ctx,
-                e: b.Right);
+            context.CurrentBlock = rightBlock;
+            MOperand rightEvaluated = LowerExpression(
+                context: context,
+                expr: bin.Right);
 
-            ctx.Cur.Instructions.Add(
+            context.CurrentBlock.Instructions.Add(
                 new Move(
-                    Dst: result,
-                    Src: r));
+                    Dst: resultTemp,
+                    Src: rightEvaluated));
 
-            ctx.Cur.Terminator = new Br(joinB);
+            context.CurrentBlock.Terminator = new Br(joinBlock);
         }
         else // OR
         {
             // if (L) goto short; else goto rhs
-            ctx.Cur.Terminator = new BrCond(
-                Cond: evalL,
-                IfTrue: shortB,
-                IfFalse: rhsB);
+            context.CurrentBlock.Terminator = new BrCond(
+                Cond: leftEvaluated,
+                IfTrue: shortBlock,
+                IfFalse: rightBlock);
 
             // short: result = true
-            ctx.Cur = shortB;
-            ctx.Cur.Instructions.Add(
+            context.CurrentBlock = shortBlock;
+            context.CurrentBlock.Instructions.Add(
                 new Move(
-                    Dst: result,
+                    Dst: resultTemp,
                     Src: new Const(true)));
 
-            ctx.Cur.Terminator = new Br(joinB);
+            context.CurrentBlock.Terminator = new Br(joinBlock);
 
             // rhs: result = R
-            ctx.Cur = rhsB;
-            MOperand? r = LowerExpr(
-                ctx: ctx,
-                e: b.Right);
+            context.CurrentBlock = rightBlock;
+            MOperand rightEvaluated = LowerExpression(
+                context: context,
+                expr: bin.Right);
 
-            ctx.Cur.Instructions.Add(
+            context.CurrentBlock.Instructions.Add(
                 new Move(
-                    Dst: result,
-                    Src: r));
+                    Dst: resultTemp,
+                    Src: rightEvaluated));
 
-            ctx.Cur.Terminator = new Br(joinB);
+            context.CurrentBlock.Terminator = new Br(joinBlock);
         }
 
-        ctx.Cur = joinB;
+        context.CurrentBlock = joinBlock;
 
-        return result;
+        return resultTemp;
     }
 
-    private void LowerStmt(
-        Ctx ctx,
-        StmtHir s)
+    private void LowerStatement(
+        LoweringContext context,
+        StmtHir stmt)
     {
-        switch (s)
+        switch (stmt)
         {
-            case BlockHir b:
-                ctx.PushScope();
+            case BlockHir block:
+                context.PushScope();
 
-                foreach (StmtHir st in b.Statements)
+                foreach (StmtHir innerStmt in block.Statements)
                 {
-                    LowerStmt(
-                        ctx: ctx,
-                        s: st);
+                    LowerStatement(
+                        context: context,
+                        stmt: innerStmt);
                 }
 
-                ctx.PopScope();
+                context.PopScope();
 
                 break;
 
-            case LetHir v:
+            case LetHir letStmt:
                 {
-                    VReg? dest = ctx.Def(v.Name);
+                    VReg? destination = context.DefineVariable(letStmt.Name);
 
-                    if (v.Init is not null)
+                    if (letStmt.Init is not null)
                     {
-                        MOperand? src = LowerExpr(
-                            ctx: ctx,
-                            e: v.Init);
+                        MOperand source = LowerExpression(
+                            context: context,
+                            expr: letStmt.Init);
 
-                        ctx.Cur.Instructions.Add(
+                        context.CurrentBlock.Instructions.Add(
                             new Move(
-                                Dst: dest,
-                                Src: src));
+                                Dst: destination,
+                                Src: source));
                     }
 
                     break;
                 }
 
-            case ExprStmtHir es:
-                if (es.Expr is not null)
+            case ExprStmtHir exprStmt:
+                if (exprStmt.Expr is not null)
                 {
-                    _ = LowerExpr(
-                        ctx: ctx,
-                        e: es.Expr);
+                    _ = LowerExpression(
+                        context: context,
+                        expr: exprStmt.Expr);
                 }
 
                 break;
 
-            case ReturnHir r:
+            case ReturnHir returnStmt:
                 {
-                    MOperand? rv = r.Expr is null
+                    MOperand? returnValue = returnStmt.Expr is null
                         ? null
-                        : LowerExpr(
-                            ctx: ctx,
-                            e: r.Expr);
+                        : LowerExpression(
+                            context: context,
+                            expr: returnStmt.Expr);
 
-                    ctx.Cur.Terminator = new Ret(rv);
-                    ctx.Cur = ctx.F.NewBlock($"dead_{ctx.F.Blocks.Count}");
+                    context.CurrentBlock.Terminator = new Ret(returnValue);
+                    context.CurrentBlock = context.CurrentFunction.NewBlock($"dead_{context.CurrentFunction.Blocks.Count}");
 
                     break;
                 }
 
-            case IfHir iff:
+            case IfHir ifStmt:
                 {
-                    MirBlock thenB = ctx.F.NewBlock($"then_{ctx.F.Blocks.Count}");
-                    MirBlock elseB = ctx.F.NewBlock($"else_{ctx.F.Blocks.Count}");
-                    MirBlock joinB = ctx.F.NewBlock($"join_{ctx.F.Blocks.Count}");
+                    MirBlock thenBlock = context.CurrentFunction.NewBlock($"then_{context.CurrentFunction.Blocks.Count}");
+                    MirBlock elseBlock = context.CurrentFunction.NewBlock($"else_{context.CurrentFunction.Blocks.Count}");
+                    MirBlock joinBlock = context.CurrentFunction.NewBlock($"join_{context.CurrentFunction.Blocks.Count}");
 
-                    MOperand? c = LowerExpr(
-                        ctx: ctx,
-                        e: iff.Cond);
+                    MOperand condition = LowerExpression(
+                        context: context,
+                        expr: ifStmt.Cond);
 
-                    ctx.Cur.Terminator = new BrCond(
-                        Cond: c,
-                        IfTrue: thenB,
-                        IfFalse: iff.Else is null
-                            ? joinB
-                            : elseB);
+                    context.CurrentBlock.Terminator = new BrCond(
+                        Cond: condition,
+                        IfTrue: thenBlock,
+                        IfFalse: ifStmt.Else is null
+                            ? joinBlock
+                            : elseBlock);
 
                     // then
-                    ctx.Cur = thenB;
-                    LowerStmt(
-                        ctx: ctx,
-                        s: iff.Then);
+                    context.CurrentBlock = thenBlock;
+                    LowerStatement(
+                        context: context,
+                        stmt: ifStmt.Then);
 
-                    if (ctx.Cur.Terminator is null)
+                    if (context.CurrentBlock.Terminator is null)
                     {
-                        ctx.Cur.Terminator = new Br(joinB);
+                        context.CurrentBlock.Terminator = new Br(joinBlock);
                     }
 
                     // else
-                    if (iff.Else is not null)
+                    if (ifStmt.Else is not null)
                     {
-                        ctx.Cur = elseB;
-                        LowerStmt(
-                            ctx: ctx,
-                            s: iff.Else);
+                        context.CurrentBlock = elseBlock;
+                        LowerStatement(
+                            context: context,
+                            stmt: ifStmt.Else);
 
-                        if (ctx.Cur.Terminator is null)
+                        if (context.CurrentBlock.Terminator is null)
                         {
-                            ctx.Cur.Terminator = new Br(joinB);
+                            context.CurrentBlock.Terminator = new Br(joinBlock);
                         }
                     }
 
                     // continue at join
-                    ctx.Cur = joinB;
+                    context.CurrentBlock = joinBlock;
 
                     break;
                 }
 
-            case WhileHir w:
+            case WhileHir whileStmt:
                 {
-                    MirBlock head = ctx.F.NewBlock($"head_{ctx.F.Blocks.Count}");
-                    MirBlock body = ctx.F.NewBlock($"body_{ctx.F.Blocks.Count}");
-                    MirBlock exit = ctx.F.NewBlock($"exit_{ctx.F.Blocks.Count}");
+                    MirBlock headBlock = context.CurrentFunction.NewBlock($"head_{context.CurrentFunction.Blocks.Count}");
+                    MirBlock bodyBlock = context.CurrentFunction.NewBlock($"body_{context.CurrentFunction.Blocks.Count}");
+                    MirBlock exitBlock = context.CurrentFunction.NewBlock($"exit_{context.CurrentFunction.Blocks.Count}");
 
-                    ctx.Cur.Terminator = new Br(head);
+                    context.CurrentBlock.Terminator = new Br(headBlock);
 
-                    ctx.Cur = head;
-                    MOperand? c = LowerExpr(
-                        ctx: ctx,
-                        e: w.Cond);
+                    context.CurrentBlock = headBlock;
+                    MOperand condition = LowerExpression(
+                        context: context,
+                        expr: whileStmt.Cond);
 
-                    ctx.Cur.Terminator = new BrCond(
-                        Cond: c,
-                        IfTrue: body,
-                        IfFalse: exit);
+                    context.CurrentBlock.Terminator = new BrCond(
+                        Cond: condition,
+                        IfTrue: bodyBlock,
+                        IfFalse: exitBlock);
 
-                    ctx.Loops.Push((exit, head));
-                    ctx.Cur = body;
-                    LowerStmt(
-                        ctx: ctx,
-                        s: w.Body);
+                    context.LoopTargets.Push((exitBlock, headBlock));
 
-                    if (ctx.Cur.Terminator is null)
+                    context.CurrentBlock = bodyBlock;
+                    LowerStatement(
+                        context: context,
+                        stmt: whileStmt.Body);
+
+                    if (context.CurrentBlock.Terminator is null)
                     {
-                        ctx.Cur.Terminator = new Br(head);
+                        context.CurrentBlock.Terminator = new Br(headBlock);
                     }
 
-                    ctx.Loops.Pop();
-
-                    ctx.Cur = exit;
+                    context.LoopTargets.Pop();
+                    context.CurrentBlock = exitBlock;
 
                     break;
                 }
 
             case BreakHir:
                 {
-                    (MirBlock brk, _) = ctx.Loops.Peek();
-                    ctx.Cur.Terminator = new Br(brk);
-                    ctx.Cur = ctx.F.NewBlock($"dead_{ctx.F.Blocks.Count}");
+                    (MirBlock breakTarget, _) = context.LoopTargets.Peek();
+                    context.CurrentBlock.Terminator = new Br(breakTarget);
+                    context.CurrentBlock = context.CurrentFunction.NewBlock($"dead_{context.CurrentFunction.Blocks.Count}");
 
                     break;
                 }
 
             case ContinueHir:
                 {
-                    (_, MirBlock cont) = ctx.Loops.Peek();
-                    ctx.Cur.Terminator = new Br(cont);
-                    ctx.Cur = ctx.F.NewBlock($"dead_{ctx.F.Blocks.Count}");
+                    (_, MirBlock continueTarget) = context.LoopTargets.Peek();
+                    context.CurrentBlock.Terminator = new Br(continueTarget);
+                    context.CurrentBlock = context.CurrentFunction.NewBlock($"dead_{context.CurrentFunction.Blocks.Count}");
 
                     break;
                 }
 
             default:
-                throw new NotSupportedException($"Stmt {s.GetType().Name} not supported in MIR lowering");
+                throw new NotSupportedException($"Stmt {stmt.GetType().Name} not supported in MIR lowering");
         }
     }
 
@@ -486,22 +488,24 @@ public sealed class HirToMir
         };
     }
 
-    private sealed class Ctx
+    private sealed class LoweringContext
     {
-        public MirBlock Cur = null!;
-        public MirFunction F = null!;
-        public readonly Stack<(MirBlock brk, MirBlock cont)> Loops = new Stack<(MirBlock brk, MirBlock cont)>();
-        public readonly MirModule Mod = new MirModule();
+        public MirBlock CurrentBlock = null!;
+        public MirFunction CurrentFunction = null!;
+        public readonly Stack<(MirBlock BreakTarget, MirBlock ContinueTarget)> LoopTargets = new Stack<(MirBlock BreakTarget, MirBlock ContinueTarget)>();
+        public readonly MirModule Module = new MirModule();
         public readonly Stack<Dictionary<string, VReg?>> Scopes = new Stack<Dictionary<string, VReg?>>();
-        public VReg? Def(
+
+        public VReg DefineVariable(
             string name)
         {
-            VReg? vr = F.NewTemp();
+            VReg reg = CurrentFunction.NewTemp();
             Scopes
-                .Peek()[name] = vr;
+                .Peek()[name] = reg;
 
-            return vr;
+            return reg;
         }
+
         public void PopScope()
         {
             Scopes.Pop();
@@ -512,21 +516,21 @@ public sealed class HirToMir
             Scopes.Push(new Dictionary<string, VReg?>());
         }
 
-        public bool TryGet(
+        public bool TryGetVariableRegister(
             string name,
-            out VReg? vr)
+            out VReg? reg)
         {
-            foreach (Dictionary<string, VReg?> s in Scopes)
+            foreach (Dictionary<string, VReg?> scope in Scopes)
             {
-                if (s.TryGetValue(
+                if (scope.TryGetValue(
                         key: name,
-                        value: out vr))
+                        value: out reg))
                 {
                     return true;
                 }
             }
 
-            vr = null!;
+            reg = null!;
 
             return false;
         }

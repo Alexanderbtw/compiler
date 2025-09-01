@@ -43,7 +43,7 @@ public sealed class MirFunction
         return b;
     }
 
-    public VReg? NewTemp()
+    public VReg NewTemp()
     {
         return new VReg(++NextTempId);
     }

@@ -19,5 +19,7 @@ public enum OpCode
 
     // calls
     CallUser, // A = funcIndex, B = argc
-    CallBuiltin // A = stringId,  B = argc
+    CallBuiltin, // A = stringId,  B = argc
+    NewArr,
+    Len
 }

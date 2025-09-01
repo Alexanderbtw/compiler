@@ -5,241 +5,288 @@ using Compiler.Frontend.Translation.MIR.Operands;
 
 namespace Compiler.Backend.VM;
 
+/// <summary>
+///     Lowers MIR (Mid-level IR) into a simple stack-based bytecode for our VM.
+///     Focuses on readability: descriptive identifiers and minimal abbreviations.
+/// </summary>
 public sealed class MirToBytecode
 {
+    /// <summary>
+    ///     Entry point: lower an entire MIR module into a VM module.
+    /// </summary>
     public VmModule Lower(
-        MirModule m)
+        MirModule mirModule)
     {
-        var vm = new VmModule();
+        var vmModule = new VmModule();
 
-        // заранее зарегистрируем все функции, чтобы знать индексы
-        foreach (MirFunction f in m.Functions)
+        // Сначала регистрируем все функции, чтобы знать их индексы заранее
+        foreach (MirFunction mirFunction in mirModule.Functions)
         {
-            vm.AddFunction(
+            vmModule.AddFunction(
                 new VmFunction(
-                    name: f.Name,
-                    arity: f.ParamRegs.Count));
+                    name: mirFunction.Name,
+                    arity: mirFunction.ParamRegs.Count));
         }
 
-        for (int i = 0; i < m.Functions.Count; i++)
+        // Затем понижаем каждую функцию по индексу (соответствие MIR↔VM сохраняется)
+        for (int functionIndex = 0; functionIndex < mirModule.Functions.Count; functionIndex++)
         {
             LowerFunction(
-                f: m.Functions[i],
-                vf: vm.Functions[i],
-                vm: vm);
+                mirFunction: mirModule.Functions[functionIndex],
+                vmFunction: vmModule.Functions[functionIndex],
+                vmModule: vmModule);
         }
 
-        return vm;
+        return vmModule;
     }
 
     private static void LowerFunction(
-        MirFunction f,
-        VmFunction vf,
-        VmModule vm)
+        MirFunction mirFunction,
+        VmFunction vmFunction,
+        VmModule vmModule)
     {
-        // vreg -> local index
-        var loc = new Dictionary<int, int>();
+        // Отображение виртуальных регистров MIR в локальные индексы VM
+        var vregToLocalIndex = new Dictionary<int, int>();
 
-        int NextLocal() =>
-            loc.Count;
+        int AllocateNextLocalIndex() =>
+            vregToLocalIndex.Count;
 
-        // Параметры → локалы (в порядке ParamRegs)
-        foreach (VReg pr in f.ParamRegs)
+        // Параметры функции → локальные слоты (в порядке ParamRegs)
+        foreach (VReg paramVReg in mirFunction.ParamRegs)
         {
-            if (!loc.ContainsKey(pr.Id))
+            if (!vregToLocalIndex.ContainsKey(paramVReg.Id))
             {
-                loc[pr.Id] = NextLocal();
+                vregToLocalIndex[paramVReg.Id] = AllocateNextLocalIndex();
             }
 
-            vf.ParamLocalIndices.Add(loc[pr.Id]);
+            vmFunction.ParamLocalIndices.Add(vregToLocalIndex[paramVReg.Id]);
         }
 
-        List<Instr> code = vf.Code;
-        var label = new Dictionary<MirBlock, int>();
-        var brFixups = new List<(int pc, MirBlock target)>();
-        var condFixups = new List<(int pcTrue, MirBlock t, int pcFalse, MirBlock fblk)>();
+        List<Instr> instructions = vmFunction.Code;
+        var blockToInstructionIndex = new Dictionary<MirBlock, int>();
+        var pendingUnconditionalBranchFixups = new List<(int pc, MirBlock target)>();
+        var pendingConditionalBranchFixups = new List<(int pcTrue, MirBlock trueBlock, int pcFalse, MirBlock falseBlock)>();
 
-        // локальный loader
-        void LdOp(
-            MOperand op)
+        // Локальные помощники загрузки/сохранения операндов
+        void EmitLoadOperand(
+            MOperand operand)
         {
-            switch (op)
+            switch (operand)
             {
-                case Const c:
-                    switch (c.Value)
+                case Const constant:
+                    switch (constant.Value)
                     {
                         case null:
-                            code.Add(new Instr { Op = OpCode.LdcNull });
+                            instructions.Add(new Instr { Op = OpCode.LdcNull });
 
                             break;
-                        case long n:
-                            code.Add(new Instr { Op = OpCode.LdcI64, Imm = n });
+                        case long number:
+                            instructions.Add(new Instr { Op = OpCode.LdcI64, Imm = number });
 
                             break;
-                        case bool b:
-                            code.Add(
+                        case bool booleanValue:
+                            instructions.Add(
                                 new Instr
                                 {
-                                    Op = OpCode.LdcBool, Imm = b
+                                    Op = OpCode.LdcBool, Imm = booleanValue
                                         ? 1
                                         : 0
                                 });
 
                             break;
-                        case char ch:
-                            code.Add(new Instr { Op = OpCode.LdcChar, Imm = ch });
+                        case char character:
+                            instructions.Add(new Instr { Op = OpCode.LdcChar, Imm = character });
 
                             break;
-                        case string s:
-                            int id = vm.AddString(s);
-                            code.Add(new Instr { Op = OpCode.LdcStr, Idx = id });
+                        case string text:
+                            int stringId = vmModule.AddString(text);
+                            instructions.Add(new Instr { Op = OpCode.LdcStr, Idx = stringId });
 
                             break;
                         default:
-                            throw new NotSupportedException($"const {c.Value?.GetType().Name}");
+                            throw new NotSupportedException($"const {constant.Value?.GetType().Name}");
                     }
 
                     break;
 
-                case VReg v:
-                    if (!loc.TryGetValue(
-                            key: v.Id,
-                            value: out int idx))
+                case VReg vreg:
+                    if (!vregToLocalIndex.TryGetValue(
+                            key: vreg.Id,
+                            value: out int localIndex))
                     {
-                        idx = NextLocal();
-                        loc[v.Id] = idx;
+                        localIndex = AllocateNextLocalIndex();
+                        vregToLocalIndex[vreg.Id] = localIndex;
                     }
 
-                    code.Add(new Instr { Op = OpCode.LdLoc, A = idx });
+                    instructions.Add(new Instr { Op = OpCode.LdLoc, A = localIndex });
 
                     break;
 
                 default:
                     throw new NotSupportedException(
-                        op.GetType()
+                        operand.GetType()
                             .Name);
             }
         }
 
-        void StDst(
-            VReg v)
+        void EmitStoreToDestination(
+            VReg destination)
         {
-            if (!loc.TryGetValue(
-                    key: v.Id,
-                    value: out int idx))
+            if (!vregToLocalIndex.TryGetValue(
+                    key: destination.Id,
+                    value: out int localIndex))
             {
-                idx = NextLocal();
-                loc[v.Id] = idx;
+                localIndex = AllocateNextLocalIndex();
+                vregToLocalIndex[destination.Id] = localIndex;
             }
 
-            code.Add(new Instr { Op = OpCode.StLoc, A = idx });
+            instructions.Add(new Instr { Op = OpCode.StLoc, A = localIndex });
         }
 
-        // Пройти блоки в порядке объявления
-        for (int bIdx = 0; bIdx < f.Blocks.Count; bIdx++)
+        // Проход по блокам в порядке объявления
+        for (int blockIndex = 0; blockIndex < mirFunction.Blocks.Count; blockIndex++)
         {
-            MirBlock b = f.Blocks[bIdx];
-            bool isLastBlock = bIdx == f.Blocks.Count - 1;
-            label[b] = code.Count;
+            MirBlock block = mirFunction.Blocks[blockIndex];
+            bool isLastBlock = blockIndex == mirFunction.Blocks.Count - 1;
+            blockToInstructionIndex[block] = instructions.Count;
 
-            foreach (MirInstr ins in b.Instructions)
+            foreach (MirInstr instruction in block.Instructions)
             {
-                switch (ins)
+                switch (instruction)
                 {
-                    case Move mv:
-                        LdOp(mv.Src);
-                        StDst(mv.Dst);
+                    case Move move:
+                        EmitLoadOperand(move.Src);
+                        EmitStoreToDestination(move.Dst);
 
                         break;
 
-                    case Bin bi:
-                        LdOp(bi.L);
-                        LdOp(bi.R);
-                        code.Add(
+                    case Bin binary:
+                        EmitLoadOperand(binary.L);
+                        EmitLoadOperand(binary.R);
+                        instructions.Add(
                             new Instr
                             {
-                                Op = bi.Op switch
+                                Op = binary.Op switch
                                 {
-                                    MBinOp.Add => OpCode.Add, MBinOp.Sub => OpCode.Sub,
+                                    MBinOp.Add => OpCode.Add,
+                                    MBinOp.Sub => OpCode.Sub,
                                     MBinOp.Mul => OpCode.Mul,
-                                    MBinOp.Div => OpCode.Div, MBinOp.Mod => OpCode.Mod,
-                                    MBinOp.Lt => OpCode.Lt, MBinOp.Le => OpCode.Le, MBinOp.Gt => OpCode.Gt,
-                                    MBinOp.Ge => OpCode.Ge, MBinOp.Eq => OpCode.Eq, MBinOp.Ne => OpCode.Ne,
-                                    _ => throw new NotSupportedException(bi.Op.ToString())
+                                    MBinOp.Div => OpCode.Div,
+                                    MBinOp.Mod => OpCode.Mod,
+                                    MBinOp.Lt => OpCode.Lt,
+                                    MBinOp.Le => OpCode.Le,
+                                    MBinOp.Gt => OpCode.Gt,
+                                    MBinOp.Ge => OpCode.Ge,
+                                    MBinOp.Eq => OpCode.Eq,
+                                    MBinOp.Ne => OpCode.Ne,
+                                    _ => throw new NotSupportedException(binary.Op.ToString())
                                 }
                             });
 
-                        StDst(bi.Dst);
+                        EmitStoreToDestination(binary.Dst);
 
                         break;
 
-                    case Un un:
-                        LdOp(un.X);
+                    case Un unary:
+                        EmitLoadOperand(unary.X);
 
-                        switch (un.Op)
+                        switch (unary.Op)
                         {
                             case MUnOp.Neg:
-                                code.Add(new Instr { Op = OpCode.Neg });
+                                instructions.Add(new Instr { Op = OpCode.Neg });
 
                                 break;
                             case MUnOp.Plus:
-                                // no-op for unary plus
+                                // унарный плюс — это no-op
                                 break;
                             case MUnOp.Not:
-                                code.Add(new Instr { Op = OpCode.Not });
+                                instructions.Add(new Instr { Op = OpCode.Not });
 
                                 break;
                             default:
-                                throw new NotSupportedException(un.Op.ToString());
+                                throw new NotSupportedException(unary.Op.ToString());
                         }
 
-                        StDst(un.Dst);
+                        EmitStoreToDestination(unary.Dst);
 
                         break;
 
-                    case LoadIndex li:
-                        LdOp(li.Arr);
-                        LdOp(li.Index);
-                        code.Add(new Instr { Op = OpCode.LdElem });
-                        StDst(li.Dst);
+                    case LoadIndex loadIndex:
+                        EmitLoadOperand(loadIndex.Arr);
+                        EmitLoadOperand(loadIndex.Index);
+                        instructions.Add(new Instr { Op = OpCode.LdElem });
+                        EmitStoreToDestination(loadIndex.Dst);
 
                         break;
 
-                    case StoreIndex si:
-                        LdOp(si.Arr);
-                        LdOp(si.Index);
-                        LdOp(si.Value);
-                        code.Add(new Instr { Op = OpCode.StElem });
+                    case StoreIndex storeIndex:
+                        EmitLoadOperand(storeIndex.Arr);
+                        EmitLoadOperand(storeIndex.Index);
+                        EmitLoadOperand(storeIndex.Value);
+                        instructions.Add(new Instr { Op = OpCode.StElem });
 
                         break;
 
-                    case Call cl:
+                    case Call call:
                         {
-                            // args
-                            foreach (MOperand a in cl.Args)
+                            // загрузить аргументы слева направо (на стек)
+                            foreach (MOperand arg in call.Args)
                             {
-                                LdOp(a);
+                                EmitLoadOperand(arg);
                             }
 
-                            if (vm.TryGetFunctionIndex(
-                                    name: cl.Callee,
-                                    idx: out int fidx))
+                            // Специализированные опкоды для горячих билтинов
+                            if (call.Callee == "array" && call.Args.Count == 1)
                             {
-                                code.Add(new Instr { Op = OpCode.CallUser, A = fidx, B = cl.Args.Count });
+                                instructions.Add(new Instr { Op = OpCode.NewArr });
+
+                                if (call.Dst is null)
+                                {
+                                    instructions.Add(new Instr { Op = OpCode.Pop });
+                                }
+                                else
+                                {
+                                    EmitStoreToDestination(call.Dst);
+                                }
+
+                                break;
+                            }
+
+                            if (call.Callee == "len" && call.Args.Count == 1)
+                            {
+                                instructions.Add(new Instr { Op = OpCode.Len });
+
+                                if (call.Dst is null)
+                                {
+                                    instructions.Add(new Instr { Op = OpCode.Pop });
+                                }
+                                else
+                                {
+                                    EmitStoreToDestination(call.Dst);
+                                }
+
+                                break;
+                            }
+
+                            if (vmModule.TryGetFunctionIndex(
+                                    name: call.Callee,
+                                    idx: out int calleeFunctionIndex))
+                            {
+                                instructions.Add(new Instr { Op = OpCode.CallUser, A = calleeFunctionIndex, B = call.Args.Count });
                             }
                             else
                             {
-                                int sid = vm.AddString(cl.Callee);
-                                code.Add(new Instr { Op = OpCode.CallBuiltin, A = sid, B = cl.Args.Count });
+                                int builtinNameId = vmModule.AddString(call.Callee);
+                                instructions.Add(new Instr { Op = OpCode.CallBuiltin, A = builtinNameId, B = call.Args.Count });
                             }
 
-                            if (cl.Dst is null)
+                            if (call.Dst is null)
                             {
-                                code.Add(new Instr { Op = OpCode.Pop });
+                                instructions.Add(new Instr { Op = OpCode.Pop });
                             }
                             else
                             {
-                                StDst(cl.Dst);
+                                EmitStoreToDestination(call.Dst);
                             }
 
                             break;
@@ -247,81 +294,81 @@ public sealed class MirToBytecode
 
                     default:
                         throw new NotSupportedException(
-                            ins.GetType()
+                            instruction.GetType()
                                 .Name);
                 }
             }
 
-            // terminator (allow fallthrough if null; last block gets implicit ret null)
-            if (b.Terminator is null)
+            // Терминатор (допускаем fallthrough при null; у последнего блока неявный `ret null`)
+            if (block.Terminator is null)
             {
                 if (isLastBlock)
                 {
-                    code.Add(new Instr { Op = OpCode.LdcNull });
-                    code.Add(new Instr { Op = OpCode.Ret });
+                    instructions.Add(new Instr { Op = OpCode.LdcNull });
+                    instructions.Add(new Instr { Op = OpCode.Ret });
                 }
 
-                // otherwise: fall through to next block by linear order
+                // иначе просто падаем дальше на следующий блок по линейному порядку
             }
             else
             {
-                switch (b.Terminator)
+                switch (block.Terminator)
                 {
-                    case Ret r:
-                        if (r.Value is null)
+                    case Ret retTerminator:
+                        if (retTerminator.Value is null)
                         {
-                            code.Add(new Instr { Op = OpCode.LdcNull });
+                            instructions.Add(new Instr { Op = OpCode.LdcNull });
                         }
                         else
                         {
-                            LdOp(r.Value);
+                            EmitLoadOperand(retTerminator.Value);
                         }
 
-                        code.Add(new Instr { Op = OpCode.Ret });
+                        instructions.Add(new Instr { Op = OpCode.Ret });
 
                         break;
 
-                    case Br br:
+                    case Br branchTerminator:
                         {
-                            int at = code.Count;
-                            code.Add(new Instr { Op = OpCode.Br, A = -1 });
-                            brFixups.Add((at, br.Target));
+                            int patchSite = instructions.Count;
+                            instructions.Add(new Instr { Op = OpCode.Br, A = -1 });
+                            pendingUnconditionalBranchFixups.Add((patchSite, branchTerminator.Target));
 
                             break;
                         }
 
-                    case BrCond bc:
+                    case BrCond condTerminator:
                         {
-                            LdOp(bc.Cond);
-                            int atT = code.Count;
-                            code.Add(new Instr { Op = OpCode.BrTrue, A = -1 });
-                            int atF = code.Count;
-                            code.Add(new Instr { Op = OpCode.Br, A = -1 });
-                            condFixups.Add((atT, bc.IfTrue, atF, bc.IfFalse));
+                            EmitLoadOperand(condTerminator.Cond);
+                            int patchSiteTrue = instructions.Count;
+                            instructions.Add(new Instr { Op = OpCode.BrTrue, A = -1 });
+                            int patchSiteFalse = instructions.Count;
+                            instructions.Add(new Instr { Op = OpCode.Br, A = -1 });
+                            pendingConditionalBranchFixups.Add((patchSiteTrue, condTerminator.IfTrue, patchSiteFalse, condTerminator.IfFalse));
 
                             break;
                         }
 
                     default:
                         throw new NotSupportedException(
-                            b.Terminator.GetType()
+                            block.Terminator.GetType()
                                 .Name);
                 }
             }
         }
 
-        // фиксапы переходов
-        foreach ((int pc, MirBlock tgt) in brFixups)
+        // Починить адреса переходов после того, как все блоки получили адреса
+        foreach ((int pc, MirBlock targetBlock) in pendingUnconditionalBranchFixups)
         {
-            vf.Code[pc] = vf.Code[pc] with { A = label[tgt] };
+            vmFunction.Code[pc] = vmFunction.Code[pc] with { A = blockToInstructionIndex[targetBlock] };
         }
 
-        foreach ((int pcT, MirBlock t, int pcF, MirBlock fblk) in condFixups)
+        foreach ((int pcTrue, MirBlock trueBlock, int pcFalse, MirBlock falseBlock) in pendingConditionalBranchFixups)
         {
-            vf.Code[pcT] = vf.Code[pcT] with { A = label[t] };
-            vf.Code[pcF] = vf.Code[pcF] with { A = label[fblk] };
+            vmFunction.Code[pcTrue] = vmFunction.Code[pcTrue] with { A = blockToInstructionIndex[trueBlock] };
+            vmFunction.Code[pcFalse] = vmFunction.Code[pcFalse] with { A = blockToInstructionIndex[falseBlock] };
         }
 
-        vf.NLocals = loc.Count;
+        vmFunction.NLocals = vregToLocalIndex.Count;
     }
 }

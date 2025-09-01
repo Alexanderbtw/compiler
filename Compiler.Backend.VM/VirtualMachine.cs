@@ -276,6 +276,41 @@ public sealed class VirtualMachine(
 
                         break;
                     }
+                case OpCode.NewArr:
+                    {
+                        int n = (int)Pop()
+                            .AsLong();
+
+                        Push(Value.FromArray(new VmArray(n)));
+
+                        break;
+                    }
+                case OpCode.Len:
+                    {
+                        Value x = Pop();
+
+                        switch (x.Tag)
+                        {
+                            case ValueTag.String:
+                                Push(
+                                    Value.FromLong(
+                                        x.AsStr()
+                                            .Length));
+
+                                break;
+                            case ValueTag.Array:
+                                Push(
+                                    Value.FromLong(
+                                        x.AsArr()
+                                            .Length));
+
+                                break;
+                            default:
+                                throw new InvalidOperationException("len: unsupported type");
+                        }
+
+                        break;
+                    }
 
                 default:
                     throw new NotSupportedException(ins.Op.ToString());
