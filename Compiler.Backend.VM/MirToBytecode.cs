@@ -236,7 +236,11 @@ public sealed class MirToBytecode
                             }
 
                             // Специализированные опкоды для горячих билтинов
-                            if (call.Callee == "array" && call.Args.Count == 1)
+                            if (call is
+                                {
+                                    Callee: "array",
+                                    Args.Count: 1
+                                })
                             {
                                 instructions.Add(new Instr { Op = OpCode.NewArr });
 
@@ -252,7 +256,11 @@ public sealed class MirToBytecode
                                 break;
                             }
 
-                            if (call.Callee == "len" && call.Args.Count == 1)
+                            if (call is
+                                {
+                                    Callee: "len",
+                                    Args.Count: 1
+                                })
                             {
                                 instructions.Add(new Instr { Op = OpCode.Len });
 

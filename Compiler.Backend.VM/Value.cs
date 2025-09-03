@@ -157,14 +157,10 @@ public readonly struct Value
     }
 }
 
-public sealed class VmArray
+public sealed class VmArray(
+    int n)
 {
-    public Value[] Data;
-    public VmArray(
-        int n)
-    {
-        Data = new Value[n];
-    }
+    public readonly Value[] Data = new Value[n];
 
     public int Length => Data.Length;
 

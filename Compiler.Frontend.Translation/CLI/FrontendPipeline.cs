@@ -15,7 +15,7 @@ public static class FrontendPipeline
         bool verbose = false)
     {
         var str = new AntlrInputStream(src);
-        var lexer = new global::MiniLangLexer(str);
+        var lexer = new MiniLangLexer(str);
         var tokens = new CommonTokenStream(lexer);
         var parser = new MiniLangParser(tokens);
 
@@ -51,6 +51,11 @@ public static class FrontendPipeline
     public static MirModule BuildMir(
         ProgramHir hir)
     {
-        return new HirToMir().Lower(hir);
+        MirModule mir = new HirToMir().Lower(hir);
+
+        new MirSimplifier().Run(mir);
+        new MirTypeAnnotator().Annotate(mir);
+
+        return mir;
     }
 }

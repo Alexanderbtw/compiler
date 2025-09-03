@@ -100,7 +100,10 @@ public static class Builtins
                     return true;
                 }
 
-                if (args[0] is string s2 && s2.Length == 1)
+                if (args[0] is string
+                    {
+                        Length: 1
+                    } s2)
                 {
                     result = (long)s2[0];
 

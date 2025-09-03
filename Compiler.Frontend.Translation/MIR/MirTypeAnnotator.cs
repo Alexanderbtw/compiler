@@ -23,7 +23,7 @@ public sealed class MirTypeAnnotator
         }
     }
 
-    public void Annotate(
+    private void Annotate(
         MirFunction function)
     {
         // Function parameters: default to Obj (can be refined later)

@@ -21,7 +21,7 @@ public sealed class MirSimplifier
         }
     }
 
-    public void SimplifyFunction(
+    private void SimplifyFunction(
         MirFunction function)
     {
         foreach (MirBlock basicBlock in function.Blocks)
@@ -218,7 +218,10 @@ public sealed class MirSimplifier
                     op: brCond.Cond,
                     environment: valueEnvironment);
 
-                if (condition is Const constant && constant.Value is bool boolean)
+                if (condition is Const
+                    {
+                        Value: bool boolean
+                    })
                 {
                     basicBlock.Terminator = new Br(
                         boolean

@@ -283,7 +283,9 @@ public sealed class SemanticChecker
                 }
 
             case BinHir b:
-                if (b.Op == BinOp.Assign && b.Left is not VarHir && b.Left is not IndexHir)
+                if (b is { Op: BinOp.Assign,
+                        Left: not VarHir and not IndexHir
+                    })
                 {
                     Error(
                         span: b.Span,

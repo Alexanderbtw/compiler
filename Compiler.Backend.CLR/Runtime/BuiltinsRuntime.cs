@@ -124,7 +124,10 @@ public static class BuiltinsRuntime
         return args[0] switch
         {
             char ch => ch,
-            string s when s.Length == 1 => (long)s[0],
+            string
+            {
+                Length: 1
+            } s => (long)s[0],
             _ => throw new ArgumentException("ord expects char or 1-length string")
         };
     }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace Compiler.Backend.VM;
 
@@ -11,8 +12,6 @@ public static class BuiltinsVm
         return name switch
         {
             "print" => Print(args),
-            "array" => Array(args),
-            "len" => Len(args),
             "clock_ms" => ClockMs(args),
             "assert" => Assert(args),
             "chr" => Chr(args),
@@ -20,19 +19,7 @@ public static class BuiltinsVm
             _ => throw new InvalidOperationException($"unknown builtin '{name}'")
         };
     }
-    private static Value Array(
-        ReadOnlySpan<Value> args)
-    {
-        if (args.Length != 1)
-        {
-            throw new InvalidOperationException("array(n) expects 1 arg");
-        }
 
-        int n = checked((int)args[0]
-            .AsInt64());
-
-        return Value.FromArray(new VmArray(n));
-    }
     private static Value Assert(
         ReadOnlySpan<Value> args)
     {
@@ -71,27 +58,7 @@ public static class BuiltinsVm
 
         return Value.FromLong(Stopwatch.GetTimestamp() * 1000 / Stopwatch.Frequency);
     }
-    private static Value Len(
-        ReadOnlySpan<Value> args)
-    {
-        if (args.Length != 1)
-        {
-            throw new InvalidOperationException("len(x) expects 1 arg");
-        }
 
-        Value x = args[0];
-
-        return x.Tag switch
-        {
-            ValueTag.String => Value.FromLong(
-                x.AsString()
-                    .Length),
-            ValueTag.Array => Value.FromLong(
-                x.AsArray()
-                    .Length),
-            _ => throw new InvalidOperationException("len: unsupported type")
-        };
-    }
     private static Value Ord(
         ReadOnlySpan<Value> args)
     {
@@ -112,11 +79,17 @@ public static class BuiltinsVm
     private static Value Print(
         ReadOnlySpan<Value> args)
     {
-        // ВАЖНО: не добавляем лишних пробелов! Просто конкат выводов подряд.
-        foreach (Value arg in args)
+        var sb = new StringBuilder();
+        for (int i = 0; i < args.Length; i++)
         {
-            Console.WriteLine(arg.ToString());
+            if (i > 0)
+            {
+                sb.Append(' ');
+            }
+            sb.Append(args[i].ToString());
         }
+
+        Console.WriteLine(sb.ToString());
 
         return Value.Null;
     }

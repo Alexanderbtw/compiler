@@ -2,7 +2,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 using Compiler.Backend.CLR.Runtime;
-using Compiler.Frontend.Translation.MIR;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
@@ -64,9 +63,6 @@ public sealed partial class CilBackend
             name: "MiniProgram",
             attr: TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
 
-        // MIR simplification: const-folding + copy-prop + branch folding
-        new MirSimplifier().Run(mod);
-
         // Собираем список имён функций (для вызовов user→user)
         var funcNames = new HashSet<string>(mod.Functions.Select(f => f.Name));
 
@@ -85,9 +81,6 @@ public sealed partial class CilBackend
             methods[f.Name] = mbuilder;
 
             ILGenerator il = mbuilder.GetILGenerator();
-
-            // Инференция типов для функции
-            new MirTypeAnnotator().Annotate(f);
 
             // vreg → local(object)
             var locals = new Dictionary<int, LocalBuilder>();

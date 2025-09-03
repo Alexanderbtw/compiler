@@ -247,45 +247,6 @@ public sealed class VirtualMachine(
                     }
 
                 // calls
-                case OpCode.CallUser:
-                    {
-                        // Pop args (rightmost at stack top), pass in the order of function parameters
-                        int argumentCount = instruction.B;
-                        var callArguments = new Value[argumentCount];
-
-                        for (int index = argumentCount - 1; index >= 0; --index)
-                        {
-                            callArguments[index] = PopValue();
-                        }
-
-                        _callStack.Push(currentFrame); // save caller
-                        currentFrame = CreateFrame(
-                            functionIndex: instruction.A,
-                            arguments: callArguments);
-
-                        break;
-                    }
-
-                case OpCode.CallBuiltin:
-                    {
-                        int argumentCount = instruction.B;
-                        var callArguments = new Value[argumentCount];
-
-                        for (int index = argumentCount - 1; index >= 0; --index)
-                        {
-                            callArguments[index] = PopValue();
-                        }
-
-                        string builtinName = module.StringPool[instruction.A];
-                        Value result = BuiltinsVm.Invoke(
-                            name: builtinName,
-                            args: callArguments);
-
-                        PushValue(result);
-
-                        break;
-                    }
-
                 case OpCode.NewArr:
                     {
                         int length = (int)PopValue()
@@ -295,7 +256,6 @@ public sealed class VirtualMachine(
 
                         break;
                     }
-
                 case OpCode.Len:
                     {
                         Value value = PopValue();
@@ -319,6 +279,43 @@ public sealed class VirtualMachine(
                             default:
                                 throw new InvalidOperationException("len: unsupported type");
                         }
+
+                        break;
+                    }
+                case OpCode.CallUser:
+                    {
+                        // Pop args (rightmost at stack top), pass in the order of function parameters
+                        int argumentCount = instruction.B;
+                        var callArguments = new Value[argumentCount];
+
+                        for (int index = argumentCount - 1; index >= 0; --index)
+                        {
+                            callArguments[index] = PopValue();
+                        }
+
+                        _callStack.Push(currentFrame); // save caller
+                        currentFrame = CreateFrame(
+                            functionIndex: instruction.A,
+                            arguments: callArguments);
+
+                        break;
+                    }
+                case OpCode.CallBuiltin:
+                    {
+                        int argumentCount = instruction.B;
+                        var callArguments = new Value[argumentCount];
+
+                        for (int index = argumentCount - 1; index >= 0; --index)
+                        {
+                            callArguments[index] = PopValue();
+                        }
+
+                        string builtinName = module.StringPool[instruction.A];
+                        Value result = BuiltinsVm.Invoke(
+                            name: builtinName,
+                            args: callArguments);
+
+                        PushValue(result);
 
                         break;
                     }

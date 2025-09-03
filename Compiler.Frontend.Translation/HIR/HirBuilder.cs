@@ -138,53 +138,71 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
     public override object VisitForStmt(
         MiniLangParser.ForStmtContext ctx)
     {
-        SourceSpan span = Span(ctx);
-
-        StmtHir? init = null;
-
-        if (ctx.variableDecl() is not null)
         {
-            init = (StmtHir)Visit(ctx.variableDecl());
+            SourceSpan span = Span(ctx);
+
+            MiniLangParser.ExpressionListContext[]? exprLists = ctx.expressionList();
+
+            StmtHir? init = null;
+            MiniLangParser.ExpressionListContext? iterListCtx = null;
+
+            if (ctx.variableDecl() is not null)
+            {
+                init = (StmtHir)Visit(ctx.variableDecl());
+
+                if (exprLists.Length > 0)
+                {
+                    iterListCtx = exprLists[0];
+                }
+            }
+            else
+            {
+                if (exprLists.Length > 0)
+                {
+                    init = ExprListToBlock(exprLists[0]);
+                }
+
+                if (exprLists.Length > 1)
+                {
+                    iterListCtx = exprLists[1];
+                }
+            }
+
+            ExprHir cond = ctx.expression() is null
+                ? new BoolHir(
+                    Value: true,
+                    Span: span)
+                : (ExprHir)Visit(ctx.expression());
+
+            var body = (StmtHir)Visit(ctx.statement());
+
+            BlockHir iterBlock = iterListCtx is null
+                ? new BlockHir(
+                    Statements: [],
+                    Span: span)
+                : ExprListToBlock(iterListCtx);
+
+            var whileBody = new BlockHir(
+                Statements: [body, iterBlock],
+                Span: span);
+
+            var list = new List<StmtHir>();
+
+            if (init is not null)
+            {
+                list.Add(init);
+            }
+
+            list.Add(
+                new WhileHir(
+                    Cond: cond,
+                    Body: whileBody,
+                    Span: span));
+
+            return new BlockHir(
+                Statements: list,
+                Span: span);
         }
-        else if (ctx.expressionList(0) is not null)
-        {
-            init = ExprListToBlock(ctx.expressionList(0));
-        }
-
-        ExprHir? cond = ctx.expression() is null
-            ? new BoolHir(
-                Value: true,
-                Span: span)
-            : (ExprHir)Visit(ctx.expression());
-
-        var body = (StmtHir)Visit(ctx.statement());
-
-        BlockHir iterBlock = ctx.expressionList(1) is null
-            ? new BlockHir(
-                Statements: [],
-                Span: span)
-            : ExprListToBlock(ctx.expressionList(1));
-
-        var whileBody = new BlockHir(
-            Statements: [body, iterBlock],
-            Span: span);
-
-        var list = new List<StmtHir>();
-
-        if (init is not null)
-        {
-            list.Add(init);
-        }
-
-        list.Add(
-            new WhileHir(
-                Cond: cond,
-                Body: whileBody,
-                Span: span));
-
-        return new BlockHir(
-            Statements: list,
-            Span: span);
     }
 
     public override object VisitFunctionDecl(

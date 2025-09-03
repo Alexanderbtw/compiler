@@ -413,14 +413,14 @@ internal static class TestUtils
             return false;
         }
 
-        if (text.Length >= 2 && text[0] == '"' && text[^1] == '"')
+        if (text is ['"', _, ..] && text[^1] == '"')
         {
             return text.Substring(
                 startIndex: 1,
                 length: text.Length - 2);
         }
 
-        if (text.Length >= 2 && text[0] == '[' && text[^1] == ']')
+        if (text is ['[', _, ..] && text[^1] == ']')
         {
             string inner = text
                 .Substring(
