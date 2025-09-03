@@ -5,6 +5,8 @@ using Antlr4.Runtime;
 
 using Compiler.Backend.CLR;
 using Compiler.Backend.VM;
+using Compiler.Backend.VM.Translation;
+using Compiler.Backend.VM.Values;
 using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR;
 using Compiler.Frontend.Translation.HIR.Common;

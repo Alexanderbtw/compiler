@@ -1,4 +1,6 @@
-﻿using Compiler.Frontend.Translation.CLI;
+﻿using Compiler.Backend.VM.Translation;
+using Compiler.Backend.VM.Values;
+using Compiler.Frontend.Translation.CLI;
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.MIR.Common;
 

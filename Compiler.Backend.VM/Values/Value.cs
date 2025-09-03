@@ -1,6 +1,4 @@
-namespace Compiler.Backend.VM;
-
-public enum ValueTag { Null, I64, Bool, Char, String, Array, Object }
+namespace Compiler.Backend.VM.Values;
 
 public readonly struct Value
 {
@@ -155,15 +153,4 @@ public readonly struct Value
             _ => Ref?.ToString() ?? "null"
         };
     }
-}
-
-public sealed class VmArray(
-    int n)
-{
-    public readonly Value[] Data = new Value[n];
-
-    public int Length => Data.Length;
-
-    public Value this[
-        int i] { get => Data[i]; set => Data[i] = value; }
 }

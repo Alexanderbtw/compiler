@@ -1,36 +1,4 @@
-namespace Compiler.Backend.VM;
-
-public struct Instr
-{
-    public int A, B; // small ints: local index, argc, targets
-    public int Idx; // indexes into pools (e.g., string pool)
-    public long Imm; // immediates for ldc.i64 / char (as int) / bool (0/1)
-    public OpCode Op;
-    public override string ToString()
-    {
-        return $"{Op} A={A} B={B} Imm={Imm} Idx={Idx}";
-    }
-}
-
-public sealed class VmFunction(
-    string name,
-    int arity)
-{
-    public int Arity { get; } = arity;
-
-    public List<Instr> Code { get; } = [];
-
-    public string Name { get; } = name;
-
-    public int NLocals { get; set; }
-
-    public List<int> ParamLocalIndices { get; } = [];
-
-    public override string ToString()
-    {
-        return $"{Name}/{Arity} locals={NLocals} ins={Code.Count}";
-    }
-}
+namespace Compiler.Backend.VM.Values;
 
 public sealed class VmModule
 {

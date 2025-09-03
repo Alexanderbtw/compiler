@@ -1,4 +1,4 @@
-namespace Compiler.Backend.VM;
+namespace Compiler.Backend.VM.Translation;
 
 public enum OpCode
 {

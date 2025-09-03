@@ -1,9 +1,10 @@
+using Compiler.Backend.VM.Values;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Frontend.Translation.MIR.Operands;
 
-namespace Compiler.Backend.VM;
+namespace Compiler.Backend.VM.Translation;
 
 /// <summary>
 ///     Lowers MIR (Mid-level IR) into a simple stack-based bytecode for our VM.

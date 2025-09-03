@@ -1,10 +1,17 @@
+using Compiler.Backend.VM.Execution;
+using Compiler.Backend.VM.Execution.GC;
+using Compiler.Backend.VM.Translation;
+using Compiler.Backend.VM.Values;
+
 namespace Compiler.Backend.VM;
 
-public sealed class VirtualMachine(
+public sealed class VirtualMachine( // TODO: GcOptions
     VmModule module,
     int stackSize = 1024)
 {
     private readonly Stack<CallFrame> _callStack = new Stack<CallFrame>(32);
+
+    private readonly GcHeap _gcHeap = new GcHeap();
     private readonly Value[] _operandStack = new Value[stackSize];
 
     private int _stackPointer;
@@ -252,7 +259,14 @@ public sealed class VirtualMachine(
                         int length = (int)PopValue()
                             .AsInt64();
 
-                        PushValue(Value.FromArray(new VmArray(length)));
+                        VmArray array = _gcHeap.AllocateArray(length);
+                        PushValue(Value.FromArray(array));
+
+                        // Opportunistic collection if threshold exceeded
+                        if (_gcHeap.ShouldCollect())
+                        {
+                            _gcHeap.Collect(EnumerateRoots(currentFrame));
+                        }
 
                         break;
                     }
@@ -404,6 +418,31 @@ public sealed class VirtualMachine(
         }
 
         return frame;
+    }
+
+    private IEnumerable<Value> EnumerateRoots(
+        CallFrame currentFrame)
+    {
+        // Operand stack roots
+        for (int i = 0; i < _stackPointer; i++)
+        {
+            yield return _operandStack[i];
+        }
+
+        // Current frame locals
+        foreach (Value v in currentFrame.Locals)
+        {
+            yield return v;
+        }
+
+        // Other call frames' locals (walk the call stack without mutating it)
+        foreach (CallFrame frame in _callStack)
+        {
+            foreach (Value v in frame.Locals)
+            {
+                yield return v;
+            }
+        }
     }
 
     private Value PopValue()

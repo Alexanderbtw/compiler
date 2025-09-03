@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace Compiler.Backend.VM;
+using Compiler.Backend.VM.Values;
+
+namespace Compiler.Backend.VM.Execution;
 
 public static class BuiltinsVm
 {
