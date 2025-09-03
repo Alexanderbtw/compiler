@@ -4,14 +4,19 @@
 - ANTLR-4 syntax parse tree -> HIR
 - *HIR may be run on interpreter*
 - HIR -> MIR
+
 - MIR -> CIL
 - *CIL may be run on CLR*
+
+- MIR -> Bytecode
+- *Bytecode may be run on own stack-based VM*
 
 # TOOD:
 - Translate MIR -> SSA
 - Run on LLVM
 - Optimizations
-- Write own backend (?)
+- Write own GC
+- Rewrite stack-based VM to register-based VM
 
 ## Goal:
 • Develop own language and virtual machine with automatic memory management and JIT compiler
