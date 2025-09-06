@@ -283,7 +283,9 @@ public sealed class SemanticChecker
                 }
 
             case BinHir b:
-                if (b is { Op: BinOp.Assign,
+                if (b is
+                    {
+                        Op: BinOp.Assign,
                         Left: not VarHir and not IndexHir
                     })
                 {

@@ -32,12 +32,12 @@ public static class FrontendPipeline
             if (listenerLexer.HadError || listenerParser.HadError)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("error in parse");
+                Console.WriteLine("Parse failed");
             }
             else
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("parse completed");
+                Console.WriteLine("Parse succeeded");
             }
 
             Console.ResetColor();

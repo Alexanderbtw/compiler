@@ -23,11 +23,11 @@ public class MirSnapshotTests
 
         MirFunction fact = mir.Functions.Single(f => f.Name == "fact");
 
-        // параметры
+        // Parameters
         Assert.Single(fact.ParamNames);
         Assert.Single(fact.ParamRegs);
 
-        // должны быть: одно условное ветвление, один возврат в then, умножение и рекурсивный вызов
+        // Should contain: one conditional branch, one return in then, a multiplication and a recursive call
         List<MirInstr> ins = fact
             .Blocks
             .SelectMany(b => b.Instructions)
@@ -40,18 +40,18 @@ public class MirSnapshotTests
 
         Assert.Contains(
             collection: terms,
-            filter: t => t is BrCond); // условный переход
+            filter: t => t is BrCond); // conditional branch
 
         Assert.Contains(
             collection: ins,
-            filter: i => i is Bin { Op: MBinOp.Mul }); // умножение
+            filter: i => i is Bin { Op: MBinOp.Mul }); // multiplication
 
         Assert.Contains(
             collection: ins,
-            filter: i => i is Call { Callee: "fact" }); // рекурсивный вызов
+            filter: i => i is Call { Callee: "fact" }); // recursive call
 
         Assert.Contains(
             collection: terms,
-            filter: t => t is Ret); // хотя бы один возврат
+            filter: t => t is Ret); // at least one return
     }
 }

@@ -2,7 +2,7 @@ namespace Compiler.Backend.CLR.Runtime;
 
 public static class Runtime
 {
-    // арифметика (возвращаем boxed long)
+    // Arithmetic (returns boxed long)
     public static object Add(
         object? a,
         object? b)
@@ -47,7 +47,7 @@ public static class Runtime
         return L(a) <= L(b);
     }
 
-    // индексаторы для object?[] (как в твоём интерпретаторе)
+    // Indexers for object?[] (aligns with interpreter)
     public static object? LoadIndex(
         object? arr,
         object? idx)
@@ -67,7 +67,7 @@ public static class Runtime
         return a[i];
     }
 
-    // сравнения (boxed bool)
+    // Comparisons (returns boxed bool)
     public static object Lt(
         object? a,
         object? b)

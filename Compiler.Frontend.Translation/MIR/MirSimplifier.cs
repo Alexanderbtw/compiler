@@ -21,6 +21,53 @@ public sealed class MirSimplifier
         }
     }
 
+    private static bool IsSupportedConstantComparison(
+        object? left,
+        object? right)
+    {
+        if (left is null || right is null)
+        {
+            return true;
+        }
+
+        Type leftType = left.GetType();
+        Type rightType = right.GetType();
+
+        if (leftType != rightType)
+        {
+            return false;
+        }
+
+        return leftType == typeof(long) || leftType == typeof(bool) || leftType == typeof(char) || leftType == typeof(string);
+    }
+
+    // For terminators we only consider direct VReg -> Const mapping (no deep chains),
+    // because side effects across blocks are not tracked here.
+    private static MOperand ResolveFromRegisterOnly(
+        MOperand op,
+        Dictionary<int, MOperand> environment)
+    {
+        return op is VReg register && environment.TryGetValue(
+            key: register.Id,
+            value: out MOperand? mapped)
+            ? mapped
+            : op;
+    }
+
+    private static MOperand ResolveOperand(
+        Dictionary<int, MOperand> environment,
+        MOperand operand)
+    {
+        if (operand is VReg register && environment.TryGetValue(
+                key: register.Id,
+                value: out MOperand? mapped))
+        {
+            return mapped;
+        }
+
+        return operand;
+    }
+
     private void SimplifyFunction(
         MirFunction function)
     {
@@ -230,53 +277,6 @@ public sealed class MirSimplifier
                 }
             }
         }
-    }
-
-    private static bool IsSupportedConstantComparison(
-        object? left,
-        object? right)
-    {
-        if (left is null || right is null)
-        {
-            return true;
-        }
-
-        Type leftType = left.GetType();
-        Type rightType = right.GetType();
-
-        if (leftType != rightType)
-        {
-            return false;
-        }
-
-        return leftType == typeof(long) || leftType == typeof(bool) || leftType == typeof(char) || leftType == typeof(string);
-    }
-
-    // For terminators we only consider direct VReg -> Const mapping (no deep chains),
-    // because side effects across blocks are not tracked here.
-    private static MOperand ResolveFromRegisterOnly(
-        MOperand op,
-        Dictionary<int, MOperand> environment)
-    {
-        return op is VReg register && environment.TryGetValue(
-            key: register.Id,
-            value: out MOperand? mapped)
-            ? mapped
-            : op;
-    }
-
-    private static MOperand ResolveOperand(
-        Dictionary<int, MOperand> environment,
-        MOperand operand)
-    {
-        if (operand is VReg register && environment.TryGetValue(
-                key: register.Id,
-                value: out MOperand? mapped))
-        {
-            return mapped;
-        }
-
-        return operand;
     }
 
     private static bool TryEvaluateBinaryConst(

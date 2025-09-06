@@ -13,7 +13,7 @@ public sealed class MirFunction
 
     public enum MType
     {
-        Obj = 0, // неизвестно/ссылочный (boxed)
+        Obj = 0, // unknown/reference (boxed)
         I64 = 1,
         Bool = 2,
         Char = 3
@@ -31,7 +31,7 @@ public sealed class MirFunction
 
     public List<VReg> ParamRegs { get; } = new List<VReg>();
 
-    // Минимальная тип-информация по виртуальным регистрам (заполняет MirTypeAnnotator)
+    // Minimal type info for virtual registers (filled by MirTypeAnnotator)
     public Dictionary<int, MType> Types { get; } = new Dictionary<int, MType>();
 
     public MirBlock NewBlock(

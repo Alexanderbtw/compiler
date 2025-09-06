@@ -82,13 +82,17 @@ public static class BuiltinsVm
         ReadOnlySpan<Value> args)
     {
         var sb = new StringBuilder();
+
         for (int i = 0; i < args.Length; i++)
         {
             if (i > 0)
             {
                 sb.Append(' ');
             }
-            sb.Append(args[i].ToString());
+
+            sb.Append(
+                args[i]
+                    .ToString());
         }
 
         Console.WriteLine(sb.ToString());

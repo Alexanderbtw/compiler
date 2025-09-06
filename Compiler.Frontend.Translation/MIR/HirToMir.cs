@@ -204,7 +204,7 @@ public sealed class HirToMir
             context: context,
             stmt: function.Body);
 
-        // Гарантируем, что у последнего активного блока есть терминатор
+        // Ensure the last active block has a terminator
         if (context.CurrentBlock.Terminator is null)
         {
             context.CurrentBlock.Terminator = new Ret(null);

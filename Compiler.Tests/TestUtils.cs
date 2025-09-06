@@ -30,8 +30,8 @@ internal static class TestUtils
 {
     public static readonly string[] SourceExtensions = [".minl"];
 
-    // --- Константы/настройки ---
-    // в TestUtils.cs (или где объявлен список дефолтных директорий)
+    // --- Constants / configuration ---
+    // Declared here (default program directories)
     private static readonly string[] DefaultProgramDirs =
     [
         Path.Combine(
@@ -229,7 +229,7 @@ internal static class TestUtils
         return new MirToBytecode().Lower(mir);
     }
 
-    // --- Общий пайплайн сборки IR ---
+    // --- Unified IR build pipeline ---
     public static ProgramHir BuildHir(
         string src)
     {
@@ -249,7 +249,7 @@ internal static class TestUtils
         return new HirToMir().Lower(hir);
     }
 
-    // --- Поиск программ для [Theory] ---
+    // --- Discover program files for [Theory] ---
     public static IEnumerable<object[]> EnumerateProgramFiles()
     {
         string dir = GetProgramsDir();
@@ -451,9 +451,9 @@ internal static class TestUtils
         throw new FormatException($"Unsupported RET format: '{text}'");
     }
 
-    // --- Ожидания (RET/STDOUT) ---
-    // sidecar: <file>.ret / <file>.out  (опционально)
-    // inline:  // RET: <value>           // STDOUT: <text>  (или // EXPECT:)
+    // --- Expectations (RET/STDOUT) ---
+    // sidecar: <file>.ret / <file>.out  (optional)
+    // inline:  // RET: <value>     // STDOUT: <text>  (or // EXPECT:)
     public static (object? expectedRet, string? expectedStdout) ReadExpectations(
         string programPath,
         string src)
@@ -569,7 +569,7 @@ internal static class TestUtils
         finally { Console.SetOut(old); }
     }
 
-    // --- Запуски: интерпретатор и CIL ---
+    // --- Runners: interpreter and CIL ---
     public static (object? ret, string stdout) RunInterpreter(
         string src)
     {
@@ -657,7 +657,7 @@ internal static class TestUtils
     }
 }
 
-// xUnit DataAttribute для файловых программ: [ProgramFilesData]
+// xUnit DataAttribute for file-based programs: [ProgramFilesData]
 [AttributeUsage(AttributeTargets.Method)]
 internal sealed class ProgramFilesDataAttribute : DataAttribute
 {

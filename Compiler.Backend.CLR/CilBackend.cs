@@ -63,15 +63,15 @@ public sealed partial class CilBackend
             name: "MiniProgram",
             attr: TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
 
-        // Собираем список имён функций (для вызовов user→user)
+        // Collect function names (for user→user calls)
         var funcNames = new HashSet<string>(mod.Functions.Select(f => f.Name));
 
-        // Генерим методы
+        // Emit methods
         var methods = new Dictionary<string, MethodBuilder>();
 
         foreach (MirFunction f in mod.Functions)
         {
-            // сигнатура: static object? f(object?[] args)
+            // Signature: static object? f(object?[] args)
             MethodBuilder mbuilder = tb.DefineMethod(
                 name: f.Name,
                 attributes: MethodAttributes.Public | MethodAttributes.Static,
@@ -116,17 +116,17 @@ public sealed partial class CilBackend
                     local: GetLocal(f.ParamRegs[i]));
             }
 
-            // метки для блоков
+            // Labels for blocks
             Dictionary<MirBlock, Label> labels = f.Blocks.ToDictionary(
                 keySelector: b => b,
                 elementSelector: _ => il.DefineLabel());
 
-            // проходим по блокам в порядке объявления
+            // Iterate blocks in declaration order
             foreach (MirBlock b in f.Blocks)
             {
                 il.MarkLabel(labels[b]);
 
-                // инструкции
+                // Instructions
                 foreach (MirInstr ins in b.Instructions)
                 {
                     EmitInstr(
@@ -138,7 +138,7 @@ public sealed partial class CilBackend
                         funcNames: funcNames);
                 }
 
-                // терминатор
+                // Terminator
                 switch (b.Terminator)
                 {
                     case null:
@@ -237,7 +237,7 @@ public sealed partial class CilBackend
                 }
             }
 
-            // безопасность: если из последнего блока не было ret — вернуть null
+            // Safety: if no ret was emitted from the last block — return null
             il.Emit(OpCodes.Ldnull);
             il.Emit(OpCodes.Ret);
         }

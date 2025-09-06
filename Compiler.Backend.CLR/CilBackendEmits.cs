@@ -58,7 +58,7 @@ public sealed partial class CilBackend
 
         if (dstT == typeof(bool) && isCmp)
         {
-            // Сравнение по i64; загрузчик сам сделает unbox/conv при необходимости
+            // Compare as i64; loader will unbox/convert if needed
             EmitLoadRaw(
                 il: il,
                 f: f,

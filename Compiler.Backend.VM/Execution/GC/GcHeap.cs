@@ -16,7 +16,21 @@ public sealed class GcHeap
     private readonly HashSet<VmArray> _allocatedArrays = [];
 
     // Simple trigger based on number of live objects. Tune or replace with a byte-based threshold if needed.
-    private int _collectionThreshold = 1024;
+    private int _collectionThreshold;
+    private readonly double _growthFactor;
+
+    public GcHeap(
+        int initialThreshold = 1024,
+        double growthFactor = 2.0)
+    {
+        _collectionThreshold = Math.Max(
+            val1: 16,
+            val2: initialThreshold);
+
+        _growthFactor = Math.Max(
+            val1: 1.0,
+            val2: growthFactor);
+    }
 
     /// <summary>Total number of arrays currently registered as live.</summary>
     public int LiveArrayCount => _allocatedArrays.Count;
@@ -116,8 +130,9 @@ public sealed class GcHeap
         // Heuristic: if still near the threshold after collection, grow it to amortize cost
         if (_allocatedArrays.Count >= _collectionThreshold)
         {
+            int grown = (int)Math.Ceiling(_collectionThreshold * _growthFactor);
             _collectionThreshold = Math.Max(
-                val1: _collectionThreshold * 2,
+                val1: grown,
                 val2: _allocatedArrays.Count + 1);
         }
     }

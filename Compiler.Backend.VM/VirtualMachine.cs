@@ -1,18 +1,24 @@
 using Compiler.Backend.VM.Execution;
 using Compiler.Backend.VM.Execution.GC;
+using Compiler.Backend.VM.Options;
 using Compiler.Backend.VM.Translation;
 using Compiler.Backend.VM.Values;
 
 namespace Compiler.Backend.VM;
 
-public sealed class VirtualMachine( // TODO: GcOptions
+public sealed class VirtualMachine(
     VmModule module,
-    int stackSize = 1024)
+    int stackSize = 1024,
+    GcOptions? options = null)
 {
     private readonly Stack<CallFrame> _callStack = new Stack<CallFrame>(32);
 
-    private readonly GcHeap _gcHeap = new GcHeap();
+    private readonly GcHeap _gcHeap = new GcHeap(
+        initialThreshold: (options ?? GcOptions.Default).InitialThreshold,
+        growthFactor: (options ?? GcOptions.Default).GrowthFactor);
+
     private readonly Value[] _operandStack = new Value[stackSize];
+    private readonly GcOptions _options = options ?? GcOptions.Default;
 
     private int _stackPointer;
 
@@ -263,7 +269,7 @@ public sealed class VirtualMachine( // TODO: GcOptions
                         PushValue(Value.FromArray(array));
 
                         // Opportunistic collection if threshold exceeded
-                        if (_gcHeap.ShouldCollect())
+                        if (_options.AutoCollect && _gcHeap.ShouldCollect())
                         {
                             _gcHeap.Collect(EnumerateRoots(currentFrame));
                         }

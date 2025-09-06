@@ -478,4 +478,5 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+AGENTS.md
 

@@ -6,7 +6,7 @@ using static BuiltinLoweringKind;
 
 public static class Builtins
 {
-    // name -> overloads (на будущее)
+    // name -> overloads (future-proof)
     public static readonly Dictionary<string, List<BuiltinDescriptor>> Table = new Dictionary<string, List<BuiltinDescriptor>>
     {
         ["print"] =
@@ -15,7 +15,7 @@ public static class Builtins
                 Name: "print",
                 MinArity: 1,
                 MaxArity: null,
-                Attributes: VarArgs /* impure по умолчанию */,
+                Attributes: VarArgs /* impure by default */,
                 ReturnType: SimpleType.Void,
                 Lowering: CallRuntime)
         ],
@@ -45,7 +45,7 @@ public static class Builtins
                 Name: "chr",
                 MinArity: 1,
                 MaxArity: 1,
-                Attributes: Pure | Foldable, // может бросать при проверке диапазона — NoThrow не ставим
+                Attributes: Pure | Foldable, // may throw on range check — do not set NoThrow
                 ReturnType: SimpleType.Char,
                 Lowering: IntrinsicChr)
         ],
@@ -66,8 +66,8 @@ public static class Builtins
                 Name: "array",
                 MinArity: 1,
                 MaxArity: 1,
-                Attributes: None, // аллокация: не Pure/Foldable
-                ReturnType: SimpleType.Unknown, // фактически возвращает object?[]; для типизации можно завести Array(T)
+                Attributes: None, // allocation: not Pure/Foldable
+                ReturnType: SimpleType.Unknown, // effectively returns object?[]; could model as Array(T) for typing
                 Lowering: CallRuntime),
 
             // array(len, init)
@@ -85,7 +85,7 @@ public static class Builtins
                 Name: "clock_ms",
                 MinArity: 0,
                 MaxArity: 0,
-                Attributes: NoThrow, // не детерминирован (не Pure, не Foldable), но и не бросает
+                Attributes: NoThrow, // non-deterministic (not Pure/Foldable), but does not throw
                 ReturnType: SimpleType.Int,
                 Lowering: CallRuntime)
         ]
@@ -103,7 +103,7 @@ public static class Builtins
         return Table.TryGetValue(
             key: name,
             value: out List<BuiltinDescriptor>? list) && list.Count > 0
-            ? (list[0].MinArity, list[0].MaxArity) // пока одна “перегрузка”
+            ? (list[0].MinArity, list[0].MaxArity) // currently a single “overload”
             : null;
     }
 

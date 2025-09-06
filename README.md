@@ -67,10 +67,22 @@ Marks:
 
  ---
 
- ## Task 3: Prime Number Generation (Sieve of Eratosthenes)
+## Task 3: Prime Number Generation (Sieve of Eratosthenes)
 
  Objective: Implement an algorithm to generate prime numbers (e.g., Sieve of Eratosthenes).
 
  Purpose: Test array manipulation, loops, and arithmetic operations.
  Benchmark: Measure the time it takes to generate all prime numbers up to 100,000.
 
+## CLI Usage
+- Run interpreter: `dotnet run --project Compiler.Interpreter [options] [file]`
+- Run VM backend: `dotnet run --project Compiler.Backend.VM [options] [file]`
+- Run CLR backend: `dotnet run --project Compiler.Backend.CLR [options] [file]`
+
+Common options:
+- `-h|--help` show help; `-v|--verbose` verbose logs
+
+VM options:
+- `--vm-gc-threshold=N` initial VM heap collection threshold (objects)
+- `--vm-gc-growth=X` threshold growth factor (e.g., 1.5)
+- `--vm-gc-auto=on|off` enable/disable opportunistic collections

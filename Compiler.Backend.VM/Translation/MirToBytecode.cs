@@ -20,7 +20,7 @@ public sealed class MirToBytecode
     {
         var vmModule = new VmModule();
 
-        // Сначала регистрируем все функции, чтобы заранее знать их индексы
+        // First register all functions to know their indices upfront
         foreach (MirFunction mirFunction in mirModule.Functions)
         {
             vmModule.AddFunction(
@@ -29,7 +29,7 @@ public sealed class MirToBytecode
                     arity: mirFunction.ParamRegs.Count));
         }
 
-        // Затем понижаем каждую функцию по индексу (соответствие MIR↔VM сохраняется)
+        // Then lower each function by index (preserving MIR↔VM correspondence)
         for (int functionIndex = 0; functionIndex < mirModule.Functions.Count; functionIndex++)
         {
             LowerFunction(
@@ -46,13 +46,13 @@ public sealed class MirToBytecode
         VmFunction vmFunction,
         VmModule vmModule)
     {
-        // Отображение виртуальных регистров MIR в локальные индексы VM
+        // Map MIR virtual registers to VM local indices
         var virtualRegisterToLocalIndex = new Dictionary<int, int>();
 
         int AllocateNextLocalIndex() =>
             virtualRegisterToLocalIndex.Count;
 
-        // Параметры функции → локальные слоты (в порядке ParamRegs)
+        // Function parameters → local slots (in ParamRegs order)
         foreach (VReg parameterRegister in mirFunction.ParamRegs)
         {
             if (!virtualRegisterToLocalIndex.ContainsKey(parameterRegister.Id))
@@ -68,7 +68,7 @@ public sealed class MirToBytecode
         var pendingUnconditionalBranchPatches = new List<(int instructionIndex, MirBlock targetBlock)>();
         var pendingConditionalBranchPatches = new List<(int truePatchIndex, MirBlock trueBlock, int falsePatchIndex, MirBlock falseBlock)>();
 
-        // Локальные помощники загрузки/сохранения операндов
+        // Local helpers to load/store operands
         void EmitLoadOperand(
             MOperand operand)
         {
@@ -144,7 +144,7 @@ public sealed class MirToBytecode
             instructions.Add(new Instr { Op = OpCode.StLoc, A = localIndex });
         }
 
-        // Проход по блокам в порядке объявления
+        // Walk blocks in declaration order
         for (int blockIndex = 0; blockIndex < mirFunction.Blocks.Count; blockIndex++)
         {
             MirBlock block = mirFunction.Blocks[blockIndex];
@@ -198,7 +198,7 @@ public sealed class MirToBytecode
 
                                 break;
                             case MUnOp.Plus:
-                                // унарный плюс — это no-op
+                                // Unary plus is a no-op
                                 break;
                             case MUnOp.Not:
                                 instructions.Add(new Instr { Op = OpCode.Not });
@@ -230,13 +230,13 @@ public sealed class MirToBytecode
 
                     case Call call:
                         {
-                            // загрузить аргументы слева направо (на стек)
+                            // Load arguments left-to-right (onto the stack)
                             foreach (MOperand arg in call.Args)
                             {
                                 EmitLoadOperand(arg);
                             }
 
-                            // Специализированные опкоды для горячих билтинов
+                            // Specialized opcodes for hot built-ins
                             if (call is
                                 {
                                     Callee: "array",
@@ -308,7 +308,7 @@ public sealed class MirToBytecode
                 }
             }
 
-            // Терминатор (допускаем fallthrough при null; у последнего блока неявный `ret null`)
+            // Terminator (allow fallthrough when null; last block has implicit `ret null`)
             if (block.Terminator is null)
             {
                 if (isLastBlock)
@@ -317,7 +317,7 @@ public sealed class MirToBytecode
                     instructions.Add(new Instr { Op = OpCode.Ret });
                 }
 
-                // иначе просто падаем дальше на следующий блок по линейному порядку
+                // Otherwise fall through to the next block in linear order
             }
             else
             {
@@ -366,7 +366,7 @@ public sealed class MirToBytecode
             }
         }
 
-        // Починить адреса переходов после того, как все блоки получили адреса
+        // Patch branch targets after all blocks received their addresses
         foreach ((int instructionIndex, MirBlock targetBlock) in pendingUnconditionalBranchPatches)
         {
             vmFunction.Code[instructionIndex] = vmFunction.Code[instructionIndex] with { A = blockToInstructionIndex[targetBlock] };

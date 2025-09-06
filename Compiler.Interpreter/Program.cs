@@ -12,7 +12,19 @@ public class Program
         string[] args)
     {
         (bool verbose, string path) = CliArgs.Parse(args);
-        string src = File.ReadAllText(path);
+
+        string src;
+
+        try
+        {
+            src = File.ReadAllText(path);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"error: failed to read '{path}': {ex.Message}");
+
+            return;
+        }
 
         ProgramHir hir = FrontendPipeline.BuildHir(
             src: src,

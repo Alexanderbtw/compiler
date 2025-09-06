@@ -229,7 +229,7 @@ public sealed class MirTypeAnnotator
 
     private static void SetTypeIfEmpty(
         MirFunction function,
-        VReg? register,
+        VReg register,
         MirFunction.MType type)
     {
         function.Types.TryAdd(

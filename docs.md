@@ -1,9 +1,13 @@
-# MiniLang – Reference Manual  
+# MiniLang – Reference Manual
 
-MiniLang is a **tiny, dynamically-typed, C-style language** used to exercise the
-whole *front-end* pipeline: **lexer → parser → AST builder → semantic checker
-→ tree-walking interpreter**.  *No code-generation has been written yet.*  
-Program files use the extension **`.minl`**.
+MiniLang is a tiny, dynamically typed, C‑style language that drives a full pipeline: lexer → parser → HIR → MIR → backends (CLR and a custom VM), plus a tree‑walking interpreter. Program files use the extension `.minl`.
+
+Backends & running
+- Interpreter: `dotnet run --project Compiler.Interpreter [options] [file]`
+- CLR backend: `dotnet run --project Compiler.Backend.CLR [options] [file]`
+- VM backend: `dotnet run --project Compiler.Backend.VM [options] [file]`
+- Useful options: `-v|--verbose`, `-h|--help`
+  - VM GC: `--vm-gc-threshold=N`, `--vm-gc-growth=X`, `--vm-gc-auto=on|off`
 
 ---
 
@@ -49,11 +53,12 @@ logicalOr        ||                    (left, short-circuit)
 assignment       =                     (right)  value of expr is RHS
 ```
 
-Truthiness rules for `if`, `while`, …  
+Truthiness (used by `if`, `while`, …)
 
-* `bool` → itself  
-* `long` → non-zero  
-* anything else → value ≠ `null`
+* `bool` → itself
+* `long` → non‑zero
+* `null` → false
+* Strings/arrays: VM/CLR treat empty as false, non‑empty as true; interpreter treats any non‑null as true
 
 ---
 
@@ -101,18 +106,22 @@ a[0] = 123;
 print(a[0]);       // 123
 ```
 
-Indices are bounds-checked; a violation raises  
-`RuntimeException: array index out of bounds`.
+Indices are bounds‑checked; out‑of‑range access raises a runtime error.
 
 ---
 
-## 7 · Built-in functions (fully implemented)
+## 7 · Built‑in functions
 
-| Name        | Arity | Behaviour                                             |
-|-------------|-------|-------------------------------------------------------|
-| `array(n)`  | 1     | Fresh array of length **n** (all elements `null`)     |
-| `print(x)`  | ...   | Text representation of **x** followed by newline      |
-| `clock_ms`  | 0     | Gets the number of milliseconds elapsed since the system started |
+| Name             | Arity   | Behaviour                                                                 |
+|------------------|---------|---------------------------------------------------------------------------|
+| `array(n)`       | 1       | Fresh array of length n (all elements `null`). VM lowers to `NewArr`.     |
+| `array(n, init)` | 2       | Interpreter/CLR only: fills with `init`. VM currently supports 1‑arg form |
+| `print(x, …)`    | varargs | Writes space‑separated values and a newline                                |
+| `len(x)`         | 1       | Length of string or array (returns `long`)                                 |
+| `ord(c)`         | 1       | Code point of `char` or 1‑length string (returns `long`)                  |
+| `chr(i)`         | 1       | `char` for integer code point (range‑checked)                              |
+| `assert(cond, msg?)` | 1–2 | Throws on false; optional message                                          |
+| `clock_ms()`     | 0       | Elapsed milliseconds (monotonic)                                           |
 
 ---
 
@@ -182,4 +191,3 @@ fn sieve(limit) {
 
 fn main() { sieve(100); }
 ```
-

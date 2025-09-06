@@ -172,7 +172,7 @@ public sealed partial class CilBackend
                 }
                 else
                 {
-                    // Fallback: как object и затем unbox.any
+                    // Fallback: load as object then unbox.any
                     EmitConst(
                         il: il,
                         val: c.Value);

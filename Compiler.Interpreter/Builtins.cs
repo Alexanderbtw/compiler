@@ -22,10 +22,10 @@ public static class Builtins
                 key: name,
                 value: out List<BuiltinDescriptor>? cands) || cands.Count == 0)
         {
-            return false; // не builtin
+            return false; // not a builtin
         }
 
-        // Подбор подходящего дескриптора по арности (без типизации)
+        // Select a descriptor by arity (no typing here)
         BuiltinDescriptor? d = null;
 
         foreach (BuiltinDescriptor cand in cands)
@@ -54,7 +54,7 @@ public static class Builtins
 
         if (d is null)
         {
-            return false; // семантика должна была отловить, но на всякий случай
+            return false; // should be caught by semantics; guard anyway
         }
 
         switch (d.Lowering)
@@ -169,7 +169,7 @@ public static class Builtins
         switch (name)
         {
             case "print":
-                // print(x, y, z ...) → пишет в stdout строку с пробелами
+                // print(x, y, z ...) → writes a space-separated line to stdout
                 Console.WriteLine(
                     string.Join(
                         separator: " ",
@@ -240,7 +240,7 @@ public static class Builtins
 
                 return false;
 
-            // Добавляй свои domain-specific runtime builtins здесь
+            // Add domain-specific runtime builtins here
 
             default:
                 return false;
