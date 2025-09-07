@@ -5,7 +5,7 @@ using Compiler.Frontend.Translation.HIR.Statements;
 
 namespace Compiler.Tests.HIR;
 
-public class HirBuilderTests
+public sealed class HirBuilderTests
 {
     [Fact]
     public void CharLiteralNodePresent()

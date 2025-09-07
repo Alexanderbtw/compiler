@@ -37,5 +37,6 @@ public readonly record struct CliArgs(
         Console.WriteLine("  --vm-gc-threshold=N   Initial VM heap collection threshold (objects)");
         Console.WriteLine("  --vm-gc-growth=X      VM threshold growth factor after GC (e.g., 1.5)");
         Console.WriteLine("  --vm-gc-auto=on|off   Enable/disable opportunistic collections");
+        Console.WriteLine("  --vm-gc-stats         Print VM GC statistics after execution");
     }
 }

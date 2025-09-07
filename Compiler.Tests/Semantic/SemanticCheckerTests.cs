@@ -1,6 +1,6 @@
 namespace Compiler.Tests.Semantic;
 
-public class SemanticCheckerTests
+public sealed class SemanticCheckerTests
 {
     [Fact]
     public void Accepts_Factorial()

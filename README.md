@@ -86,3 +86,4 @@ VM options:
 - `--vm-gc-threshold=N` initial VM heap collection threshold (objects)
 - `--vm-gc-growth=X` threshold growth factor (e.g., 1.5)
 - `--vm-gc-auto=on|off` enable/disable opportunistic collections
+- `--vm-gc-stats` print VM GC statistics after execution

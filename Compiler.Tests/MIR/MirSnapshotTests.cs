@@ -6,7 +6,7 @@ using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 
 namespace Compiler.Tests.MIR;
 
-public class MirSnapshotTests
+public sealed class MirSnapshotTests
 {
     [Fact]
     public void Factorial_Mir_HasCoreShape()

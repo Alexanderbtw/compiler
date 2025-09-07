@@ -5,7 +5,7 @@ using Compiler.Frontend.Translation.MIR.Operands;
 
 namespace Compiler.Tests.MIR;
 
-public class HirToMirTests
+public sealed class HirToMirTests
 {
     [Fact]
     public void Calls_UserAndBuiltin()

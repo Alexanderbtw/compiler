@@ -7,7 +7,7 @@ Backends & running
 - CLR backend: `dotnet run --project Compiler.Backend.CLR [options] [file]`
 - VM backend: `dotnet run --project Compiler.Backend.VM [options] [file]`
 - Useful options: `-v|--verbose`, `-h|--help`
-  - VM GC: `--vm-gc-threshold=N`, `--vm-gc-growth=X`, `--vm-gc-auto=on|off`
+- VM GC: `--vm-gc-threshold=N`, `--vm-gc-growth=X`, `--vm-gc-auto=on|off`, `--vm-gc-stats`
 
 ---
 

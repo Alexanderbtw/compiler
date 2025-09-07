@@ -2,7 +2,7 @@ using Xunit.Abstractions;
 
 namespace Compiler.Tests.CLR;
 
-public class BackendCilFileTests(
+public sealed class BackendCilFileTests(
     ITestOutputHelper testOutputHelper)
 {
     [Theory]

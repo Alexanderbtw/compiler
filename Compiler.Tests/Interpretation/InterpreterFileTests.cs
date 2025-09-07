@@ -2,7 +2,7 @@ using Xunit.Abstractions;
 
 namespace Compiler.Tests.Interpretation;
 
-public class InterpreterFileTests(
+public sealed class InterpreterFileTests(
     ITestOutputHelper testOutputHelper)
 {
     [Theory]

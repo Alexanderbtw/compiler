@@ -11,29 +11,29 @@ namespace Compiler.Backend.VM.Execution.GC;
 ///     Objects themselves are ordinary managed instances; removing them from the registry
 ///     allows the CLR to collect them.
 /// </summary>
-public sealed class GcHeap
+public sealed class GcHeap(
+    int initialThreshold = 1024,
+    double growthFactor = 2.0)
 {
     private readonly HashSet<VmArray> _allocatedArrays = [];
 
     // Simple trigger based on number of live objects. Tune or replace with a byte-based threshold if needed.
-    private int _collectionThreshold;
-    private readonly double _growthFactor;
+    private readonly double _growthFactor = Math.Max(
+        val1: 1.0,
+        val2: growthFactor);
 
-    public GcHeap(
-        int initialThreshold = 1024,
-        double growthFactor = 2.0)
-    {
-        _collectionThreshold = Math.Max(
-            val1: 16,
-            val2: initialThreshold);
+    public int Collections { get; private set; }
 
-        _growthFactor = Math.Max(
-            val1: 1.0,
-            val2: growthFactor);
-    }
+    public int CollectionThreshold { get; private set; } = Math.Max(
+        val1: 16,
+        val2: initialThreshold);
 
     /// <summary>Total number of arrays currently registered as live.</summary>
     public int LiveArrayCount => _allocatedArrays.Count;
+
+    public int PeakLive { get; private set; }
+
+    public int TotalAllocations { get; private set; }
 
     /// <summary>Allocate a new VM array and register it with the GC heap.</summary>
     public VmArray AllocateArray(
@@ -48,6 +48,12 @@ public sealed class GcHeap
 
         var array = new VmArray(length);
         _allocatedArrays.Add(array);
+        TotalAllocations++;
+
+        if (_allocatedArrays.Count > PeakLive)
+        {
+            PeakLive = _allocatedArrays.Count;
+        }
 
         return array;
     }
@@ -60,6 +66,8 @@ public sealed class GcHeap
     public void Collect(
         IEnumerable<Value> roots)
     {
+        Collections++;
+
         if (roots is null)
         {
             throw new ArgumentNullException(nameof(roots));
@@ -127,21 +135,37 @@ public sealed class GcHeap
             _allocatedArrays.Remove(dead);
         }
 
-        // Heuristic: if still near the threshold after collection, grow it to amortize cost
-        if (_allocatedArrays.Count >= _collectionThreshold)
+        if (_allocatedArrays.Count > PeakLive)
         {
-            int grown = (int)Math.Ceiling(_collectionThreshold * _growthFactor);
-            _collectionThreshold = Math.Max(
+            PeakLive = _allocatedArrays.Count;
+        }
+
+        // Heuristic: if still near the threshold after collection, grow it to amortize cost
+        if (_allocatedArrays.Count >= CollectionThreshold)
+        {
+            int grown = (int)Math.Ceiling(CollectionThreshold * _growthFactor);
+            CollectionThreshold = Math.Max(
                 val1: grown,
                 val2: _allocatedArrays.Count + 1);
         }
+    }
+
+    public GcStats GetStats()
+    {
+        return new GcStats(
+            totalAllocations: TotalAllocations,
+            collections: Collections,
+            peakLive: PeakLive,
+            live: _allocatedArrays.Count,
+            threshold: CollectionThreshold,
+            growthFactor: _growthFactor);
     }
 
     /// <summary>Configure the collection threshold (minimum 16).</summary>
     public void SetThreshold(
         int threshold)
     {
-        _collectionThreshold = Math.Max(
+        CollectionThreshold = Math.Max(
             val1: 16,
             val2: threshold);
     }
@@ -149,6 +173,6 @@ public sealed class GcHeap
     /// <summary>Returns true if the heap suggests doing a collection after an allocation.</summary>
     public bool ShouldCollect()
     {
-        return _allocatedArrays.Count >= _collectionThreshold;
+        return _allocatedArrays.Count >= CollectionThreshold;
     }
 }

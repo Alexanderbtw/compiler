@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 
+using Compiler.Backend.VM.Execution.GC;
 using Compiler.Backend.VM.Options;
 using Compiler.Backend.VM.Translation;
 using Compiler.Backend.VM.Values;
@@ -38,7 +39,7 @@ public class Program
         VmModule vmModule = new MirToBytecode().Lower(mir);
 
         // VM GC tuning via CLI
-        GcOptions vmGc = ParseVmGcOptions(args);
+        (GcOptions vmGc, bool printGcStats) = GcCli.ParseFromArgs(args);
         var vm = new VirtualMachine(
             module: vmModule,
             options: vmGc);
@@ -49,61 +50,26 @@ public class Program
         {
             Console.WriteLine($"[ret] {ret}");
         }
-    }
 
-    private static GcOptions ParseVmGcOptions(
-        string[] args)
-    {
-        bool auto = true;
-        int threshold = 1024;
-        double growth = 2.0;
-
-        foreach (string arg in args)
+        if (printGcStats)
         {
-            if (arg.StartsWith(
-                    value: "--vm-gc-threshold=",
-                    comparisonType: StringComparison.OrdinalIgnoreCase))
-            {
-                string raw = arg["--vm-gc-threshold=".Length..];
+            GcStats s = vm.GetGcStats();
+            Console.WriteLine(
+                format: "[gc] mode=vm auto={0} threshold={1} growth={2}",
+                arg0: vmGc.AutoCollect
+                    ? "on"
+                    : "off",
+                arg1: s.Threshold,
+                arg2: s.GrowthFactor.ToString(CultureInfo.InvariantCulture));
 
-                if (int.TryParse(
-                        s: raw,
-                        result: out int thr) && thr > 0)
-                {
-                    threshold = thr;
-                }
-            }
-            else if (arg.StartsWith(
-                         value: "--vm-gc-growth=",
-                         comparisonType: StringComparison.OrdinalIgnoreCase))
-            {
-                string raw = arg["--vm-gc-growth=".Length..];
-
-                if (double.TryParse(
-                        s: raw,
-                        style: NumberStyles.Float,
-                        provider: CultureInfo.InvariantCulture,
-                        result: out double g) && g >= 1.0)
-                {
-                    growth = g;
-                }
-            }
-            else if (arg.StartsWith(
-                         value: "--vm-gc-auto=",
-                         comparisonType: StringComparison.OrdinalIgnoreCase))
-            {
-                string raw = arg["--vm-gc-auto=".Length..]
-                    .ToLowerInvariant();
-
-                auto = raw is not ("off" or "false" or "0");
-            }
+            Console.WriteLine(
+                format: "[gc] allocations={0} collections={1} live={2} peak_live={3}",
+                s.TotalAllocations,
+                s.Collections,
+                s.Live,
+                s.PeakLive);
         }
-
-        return new GcOptions
-        {
-            AutoCollect = auto,
-            InitialThreshold = threshold,
-            GrowthFactor = growth
-        };
     }
+
+    // GC options parsing moved to Options.GcCli for testability
 }

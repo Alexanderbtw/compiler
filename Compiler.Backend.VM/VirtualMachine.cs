@@ -346,6 +346,11 @@ public sealed class VirtualMachine(
         }
     }
 
+    public GcStats GetGcStats()
+    {
+        return _gcHeap.GetStats();
+    }
+
     private static bool AreValuesEqual(
         Value a,
         Value b)

@@ -2,7 +2,7 @@ using Xunit.Abstractions;
 
 namespace Compiler.Tests.VM;
 
-public class BackendVmFileTests(
+public sealed class BackendVmFileTests(
     ITestOutputHelper testOutputHelper)
 {
     [Theory]
