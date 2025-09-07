@@ -2,12 +2,34 @@
 
 MiniLang is a tiny, dynamically typed, C‑style language that drives a full pipeline: lexer → parser → HIR → MIR → backends (CLR and a custom VM), plus a tree‑walking interpreter. Program files use the extension `.minl`.
 
-Backends & running
+## Repository Structure
+- Solution: `Compiler.sln`
+- Projects: `Compiler.Frontend`, `Compiler.Frontend.Translation`, `Compiler.Interpreter`, `Compiler.Backend.CLR`, `Compiler.Backend.VM`, `Compiler.Tests`
+
+## Build & Test
+- Build: `dotnet build Compiler.sln -c Debug`
+- Test: `dotnet test --collect:"XPlat Code Coverage"`
+- Format: `dotnet format`
+
+## Run
 - Interpreter: `dotnet run --project Compiler.Interpreter [options] [file]`
-- CLR backend: `dotnet run --project Compiler.Backend.CLR [options] [file]`
 - VM backend: `dotnet run --project Compiler.Backend.VM [options] [file]`
-- Useful options: `-v|--verbose`, `-h|--help`
-- VM GC: `--vm-gc-threshold=N`, `--vm-gc-growth=X`, `--vm-gc-auto=on|off`, `--vm-gc-stats`
+- CLR backend: `dotnet run --project Compiler.Backend.CLR [options] [file]`
+
+### Common options
+- `-h|--help` show help; `-v|--verbose` verbose logs
+
+### VM GC options
+- `--vm-gc-threshold=N` initial VM heap collection threshold (objects)
+- `--vm-gc-growth=X` threshold growth factor (e.g., 1.5)
+- `--vm-gc-auto=on|off` enable/disable opportunistic collections
+- `--vm-gc-stats` print VM GC statistics after execution
+
+Example GC stats output
+```
+[gc] mode=vm auto=on threshold=64 growth=1.5
+[gc] allocations=128 collections=3 live=10 peak_live=70
+```
 
 ---
 
