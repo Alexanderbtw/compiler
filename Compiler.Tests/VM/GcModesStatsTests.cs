@@ -1,7 +1,7 @@
+using Compiler.Backend.JIT.CIL;
 using Compiler.Backend.VM;
 using Compiler.Backend.VM.Execution.GC;
 using Compiler.Backend.VM.Options;
-using Compiler.Backend.VM.Values;
 
 using Xunit.Abstractions;
 
@@ -24,13 +24,13 @@ public sealed class GcModesStatsTests(
         int thr,
         double growth)
     {
-        VmModule bytecode = TestUtils.BuildBytecode(AllocLoopSrc);
         var opts = new GcOptions { AutoCollect = auto, InitialThreshold = thr, GrowthFactor = growth };
-        var vm = new VirtualMachine(
-            module: bytecode,
-            options: opts);
-
-        vm.Execute();
+        var vm = new VirtualMachine(options: opts);
+        var jit = new MirJitCil();
+        jit.Execute(
+            vm: vm,
+            module: TestUtils.BuildMir(AllocLoopSrc),
+            entry: "main");
 
         GcStats s = vm.GetGcStats();
         output.WriteLine(

@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Compiler.Backend.CLR\Compiler.Backend.CLR.csproj"/>
+    <ProjectReference Include="..\Compiler.Backend.JIT.CIL\Compiler.Backend.JIT.CIL.csproj"/>
     <ProjectReference Include="..\Compiler.Backend.VM\Compiler.Backend.VM.csproj"/>
     <ProjectReference Include="..\Compiler.Frontend\Compiler.Frontend.csproj"/>
     <ProjectReference Include="..\Compiler.Interpreter\Compiler.Interpreter.csproj"/>

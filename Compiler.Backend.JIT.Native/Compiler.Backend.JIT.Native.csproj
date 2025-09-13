@@ -9,7 +9,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
+    <ProjectReference Include="..\Compiler.Backend.VM\Compiler.Backend.VM.csproj"/>
   </ItemGroup>
+
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
 
   <ItemGroup>
     <None Update="main.minl">

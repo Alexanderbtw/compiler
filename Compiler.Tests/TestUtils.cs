@@ -3,9 +3,8 @@ using System.Text;
 
 using Antlr4.Runtime;
 
-using Compiler.Backend.CLR;
+using Compiler.Backend.JIT.CIL;
 using Compiler.Backend.VM;
-using Compiler.Backend.VM.Translation;
 using Compiler.Backend.VM.Values;
 using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR;
@@ -28,8 +27,6 @@ namespace Compiler.Tests;
 
 internal static class TestUtils
 {
-    public static readonly string[] SourceExtensions = [".minl"];
-
     // --- Constants / configuration ---
     // Declared here (default program directories)
     private static readonly string[] DefaultProgramDirs =
@@ -38,6 +35,8 @@ internal static class TestUtils
             path1: AppContext.BaseDirectory,
             path2: "Tasks")
     ];
+
+    private static readonly string[] SourceExtensions = [".minl"];
 
     public static IEnumerable<MirInstr> AllMirInstructions(
         MirFunction f)
@@ -96,7 +95,221 @@ internal static class TestUtils
         }
     }
 
-    public static void AssertReturnEqual(
+    public static void AssertSemanticFails(
+        string src,
+        string expectedSubstring)
+    {
+        ICharStream? input = CharStreams.fromString(src);
+        var lexer = new MiniLangLexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new MiniLangParser(tokens);
+        ProgramHir hir = new HirBuilder().Build(parser.program());
+        var ex = Assert.Throws<SemanticException>(() => new SemanticChecker().Check(hir));
+        Assert.Contains(
+            expectedSubstring: expectedSubstring,
+            actualString: ex.Message);
+    }
+
+    public static void AssertSemanticOk(
+        string src)
+    {
+        ICharStream? input = CharStreams.fromString(src);
+        var lexer = new MiniLangLexer(input);
+        var tokens = new CommonTokenStream(lexer);
+        var parser = new MiniLangParser(tokens);
+        ProgramHir hir = new HirBuilder().Build(parser.program());
+        new SemanticChecker().Check(hir); // must not throw
+    }
+
+    // Bytecode layer removed: no BuildBytecode.
+
+    // --- Unified IR build pipeline ---
+    public static ProgramHir BuildHir(
+        string src)
+    {
+        MiniLangParser parser = CreateParser(src);
+        MiniLangParser.ProgramContext? tree = parser.program();
+        ProgramHir hir = new HirBuilder().Build(tree);
+        new SemanticChecker().Check(hir);
+
+        return hir;
+    }
+
+    public static MirModule BuildMir(
+        string src)
+    {
+        ProgramHir hir = BuildHir(src);
+
+        return new HirToMir().Lower(hir);
+    }
+
+    // --- Discover program files for [Theory] ---
+    public static IEnumerable<object[]> EnumerateProgramFiles()
+    {
+        string dir = GetProgramsDir();
+
+        return Directory
+            .EnumerateFiles(
+                path: dir,
+                searchPattern: "*",
+                searchOption: SearchOption.TopDirectoryOnly)
+            .Where(f => SourceExtensions.Contains(
+                value: Path.GetExtension(f),
+                comparer: StringComparer.OrdinalIgnoreCase))
+            .OrderBy(
+                keySelector: f => f,
+                comparer: StringComparer.OrdinalIgnoreCase)
+            .Select(f => new object[] { f });
+    }
+
+    public static IEnumerable<ExprHir> FlattenStmts(
+        StmtHir s)
+    {
+        return s switch
+        {
+            BlockHir b => b.Statements.SelectMany(FlattenStmts),
+            LetHir v => v.Init is null
+                ? []
+                : FlattenExpr(v.Init),
+            ExprStmtHir e => e.Expr is null
+                ? []
+                : FlattenExpr(e.Expr),
+            IfHir i => FlattenExpr(i.Cond)
+                .Concat(FlattenStmts(i.Then))
+                .Concat(
+                    i.Else is not null
+                        ? FlattenStmts(i.Else)
+                        : []),
+            WhileHir w => FlattenExpr(w.Cond)
+                .Concat(FlattenStmts(w.Body)),
+            _ => []
+        };
+    }
+
+    public static MirFunction LowerFunction(
+        string src,
+        string name = "main")
+    {
+        MirModule mir = BuildMir(src);
+
+        return mir.Functions.Single(f => f.Name == name);
+    }
+
+    public static void RunAndAssertFile(
+        string path,
+        Func<string, (object? ret, string stdout)> runner,
+        ITestOutputHelper? log = null)
+    {
+        string src = File.ReadAllText(path);
+        (object? expRet, string? expOut) = ReadExpectations(
+            programPath: path,
+            src: src);
+
+        (object? ret, string stdout) = runner(src);
+        AssertProgramResult(
+            expectedRet: expRet,
+            expectedStdout: expOut,
+            actualRet: ret,
+            actualStdout: stdout,
+            log: log);
+    }
+
+    public static void RunAndAssertSource(
+        string src,
+        Func<string, (object? ret, string stdout)> runner,
+        string? pathForExpectations = null,
+        ITestOutputHelper? log = null)
+    {
+        (object? expRet, string? expOut) = pathForExpectations is null
+            ? (null, null)
+            : ReadExpectations(
+                programPath: pathForExpectations,
+                src: src);
+
+        (object? ret, string stdout) = runner(src);
+        AssertProgramResult(
+            expectedRet: expRet,
+            expectedStdout: expOut,
+            actualRet: ret,
+            actualStdout: stdout,
+            log: log);
+    }
+
+    public static (object? ret, string stdout) RunCil(
+        string src)
+    {
+        MirModule mir = BuildMir(src);
+        var vm = new VirtualMachine();
+        var backend = new MirJitCil();
+
+        var sb = new StringBuilder();
+        TextWriter old = Console.Out;
+        Console.SetOut(new StringWriter(sb));
+
+        try
+        {
+            Value v = backend.Execute(
+                vm: vm,
+                module: mir,
+                entry: "main");
+
+            return (TryUnwrapVmValue(v), sb
+                .ToString()
+                .TrimEnd());
+        }
+        finally { Console.SetOut(old); }
+    }
+
+    // --- Runners: interpreter and CIL ---
+    public static (object? ret, string stdout) RunInterpreter(
+        string src)
+    {
+        ProgramHir hir = BuildHir(src);
+        var interp = new Interpreter.Interpreter(hir);
+
+        var sb = new StringBuilder();
+        TextWriter old = Console.Out;
+        Console.SetOut(new StringWriter(sb));
+
+        try
+        {
+            object? ret = interp.Run();
+
+            return (ret, sb
+                .ToString()
+                .TrimEnd());
+        }
+        finally { Console.SetOut(old); }
+    }
+
+    // VM interpreter removed: use MIR JIT runners instead.
+
+    public static (object? ret, string stdout) RunVmMirJit(
+        string src)
+    {
+        MirModule mir = BuildMir(src);
+        var vm = new VirtualMachine();
+
+        var sb = new StringBuilder();
+        TextWriter old = Console.Out;
+        Console.SetOut(new StringWriter(sb));
+
+        try
+        {
+            var jit = new MirJitCil();
+            Value v = jit.Execute(
+                vm: vm,
+                module: mir,
+                entry: "main");
+
+            return (TryUnwrapVmValue(v), sb
+                .ToString()
+                .TrimEnd());
+        }
+        finally { Console.SetOut(old); }
+    }
+
+    private static void AssertReturnEqual(
         object expected,
         object? actual)
     {
@@ -107,33 +320,33 @@ internal static class TestUtils
             case long el:
                 Assert.True(
                     condition: actual is long,
-                    userMessage: $"Expected long but got {actual?.GetType().Name ?? "null"}");
+                    userMessage: $"Expected long but got {actual.GetType().Name}");
 
                 Assert.Equal(
                     expected: el,
-                    actual: (long)actual!);
+                    actual: (long)actual);
 
                 break;
 
             case bool eb:
                 Assert.True(
                     condition: actual is bool,
-                    userMessage: $"Expected bool but got {actual?.GetType().Name ?? "null"}");
+                    userMessage: $"Expected bool but got {actual.GetType().Name}");
 
                 Assert.Equal(
                     expected: eb,
-                    actual: (bool)actual!);
+                    actual: (bool)actual);
 
                 break;
 
             case string es:
                 Assert.True(
                     condition: actual is string,
-                    userMessage: $"Expected string but got {actual?.GetType().Name ?? "null"}");
+                    userMessage: $"Expected string but got {actual.GetType().Name}");
 
                 Assert.Equal(
                     expected: es,
-                    actual: (string)actual!);
+                    actual: (string)actual);
 
                 break;
 
@@ -195,80 +408,19 @@ internal static class TestUtils
         }
     }
 
-    public static void AssertSemanticFails(
-        string src,
-        string expectedSubstring)
+    // Bytecode JIT removed: use RunVmMirJit instead.
+
+    private static MiniLangParser CreateParser(
+        string src)
     {
-        ICharStream? input = CharStreams.fromString(src);
-        var lexer = new MiniLangLexer(input);
+        var str = new AntlrInputStream(src);
+        var lexer = new Frontend.MiniLangLexer(str);
         var tokens = new CommonTokenStream(lexer);
-        var parser = new MiniLangParser(tokens);
-        ProgramHir hir = new HirBuilder().Build(parser.program());
-        var ex = Assert.Throws<SemanticException>(() => new SemanticChecker().Check(hir));
-        Assert.Contains(
-            expectedSubstring: expectedSubstring,
-            actualString: ex.Message);
+
+        return new MiniLangParser(tokens);
     }
 
-    public static void AssertSemanticOk(
-        string src)
-    {
-        ICharStream? input = CharStreams.fromString(src);
-        var lexer = new MiniLangLexer(input);
-        var tokens = new CommonTokenStream(lexer);
-        var parser = new MiniLangParser(tokens);
-        ProgramHir hir = new HirBuilder().Build(parser.program());
-        new SemanticChecker().Check(hir); // must not throw
-    }
-
-    public static VmModule BuildBytecode(
-        string src)
-    {
-        MirModule mir = BuildMir(src);
-
-        return new MirToBytecode().Lower(mir);
-    }
-
-    // --- Unified IR build pipeline ---
-    public static ProgramHir BuildHir(
-        string src)
-    {
-        MiniLangParser parser = CreateParser(src);
-        MiniLangParser.ProgramContext? tree = parser.program();
-        ProgramHir hir = new HirBuilder().Build(tree);
-        new SemanticChecker().Check(hir);
-
-        return hir;
-    }
-
-    public static MirModule BuildMir(
-        string src)
-    {
-        ProgramHir hir = BuildHir(src);
-
-        return new HirToMir().Lower(hir);
-    }
-
-    // --- Discover program files for [Theory] ---
-    public static IEnumerable<object[]> EnumerateProgramFiles()
-    {
-        string dir = GetProgramsDir();
-
-        return Directory
-            .EnumerateFiles(
-                path: dir,
-                searchPattern: "*",
-                searchOption: SearchOption.TopDirectoryOnly)
-            .Where(f => SourceExtensions.Contains(
-                value: Path.GetExtension(f),
-                comparer: StringComparer.OrdinalIgnoreCase))
-            .OrderBy(
-                keySelector: f => f,
-                comparer: StringComparer.OrdinalIgnoreCase)
-            .Select(f => new object[] { f });
-    }
-
-    public static IEnumerable<ExprHir> FlattenExpr(
+    private static IEnumerable<ExprHir> FlattenExpr(
         ExprHir? e)
     {
         if (e is null)
@@ -327,31 +479,7 @@ internal static class TestUtils
         }
     }
 
-    public static IEnumerable<ExprHir> FlattenStmts(
-        StmtHir s)
-    {
-        return s switch
-        {
-            BlockHir b => b.Statements.SelectMany(FlattenStmts),
-            LetHir v => v.Init is null
-                ? []
-                : FlattenExpr(v.Init),
-            ExprStmtHir e => e.Expr is null
-                ? []
-                : FlattenExpr(e.Expr),
-            IfHir i => FlattenExpr(i.Cond)
-                .Concat(FlattenStmts(i.Then))
-                .Concat(
-                    i.Else is not null
-                        ? FlattenStmts(i.Else)
-                        : []),
-            WhileHir w => FlattenExpr(w.Cond)
-                .Concat(FlattenStmts(w.Body)),
-            _ => []
-        };
-    }
-
-    public static string GetProgramsDir()
+    private static string GetProgramsDir()
     {
         string? env = Environment.GetEnvironmentVariable("MLANG_TEST_PROGRAMS");
 
@@ -371,16 +499,7 @@ internal static class TestUtils
         throw new DirectoryNotFoundException("Set env MLANG_TEST_PROGRAMS or create testdata/programs relative to the test project.");
     }
 
-    public static MirFunction LowerFunction(
-        string src,
-        string name = "main")
-    {
-        MirModule mir = BuildMir(src);
-
-        return mir.Functions.Single(f => f.Name == name);
-    }
-
-    public static string NormalizeNewlines(
+    private static string NormalizeNewlines(
         string s)
     {
         return s.Replace(
@@ -388,7 +507,7 @@ internal static class TestUtils
             newValue: "\n");
     }
 
-    public static object? ParseValue(
+    private static object? ParseValue(
         string text)
     {
         if (string.Equals(
@@ -454,13 +573,13 @@ internal static class TestUtils
     // --- Expectations (RET/STDOUT) ---
     // sidecar: <file>.ret / <file>.out  (optional)
     // inline:  // RET: <value>     // STDOUT: <text>  (or // EXPECT:)
-    public static (object? expectedRet, string? expectedStdout) ReadExpectations(
+    private static (object? expectedRet, string? expectedStdout) ReadExpectations(
         string programPath,
         string src)
     {
         string baseName = Path.Combine(
             path1: Path.GetDirectoryName(programPath)!,
-            path2: Path.GetFileNameWithoutExtension(programPath)!);
+            path2: Path.GetFileNameWithoutExtension(programPath));
 
         string retPath = baseName + ".ret";
         string outPath = baseName + ".out";
@@ -506,120 +625,6 @@ internal static class TestUtils
         }
 
         return (expRet, expOut);
-    }
-
-    public static void RunAndAssertFile(
-        string path,
-        Func<string, (object? ret, string stdout)> runner,
-        ITestOutputHelper? log = null)
-    {
-        string src = File.ReadAllText(path);
-        (object? expRet, string? expOut) = ReadExpectations(
-            programPath: path,
-            src: src);
-
-        (object? ret, string stdout) = runner(src);
-        AssertProgramResult(
-            expectedRet: expRet,
-            expectedStdout: expOut,
-            actualRet: ret,
-            actualStdout: stdout,
-            log: log);
-    }
-
-    public static void RunAndAssertSource(
-        string src,
-        Func<string, (object? ret, string stdout)> runner,
-        string? pathForExpectations = null,
-        ITestOutputHelper? log = null)
-    {
-        (object? expRet, string? expOut) = pathForExpectations is null
-            ? (null, null)
-            : ReadExpectations(
-                programPath: pathForExpectations,
-                src: src);
-
-        (object? ret, string stdout) = runner(src);
-        AssertProgramResult(
-            expectedRet: expRet,
-            expectedStdout: expOut,
-            actualRet: ret,
-            actualStdout: stdout,
-            log: log);
-    }
-
-    public static (object? ret, string stdout) RunCil(
-        string src)
-    {
-        MirModule mir = BuildMir(src);
-        var backend = new CilBackend();
-
-        var sb = new StringBuilder();
-        TextWriter old = Console.Out;
-        Console.SetOut(new StringWriter(sb));
-
-        try
-        {
-            object? ret = backend.RunMain(mir);
-
-            return (ret, sb
-                .ToString()
-                .TrimEnd());
-        }
-        finally { Console.SetOut(old); }
-    }
-
-    // --- Runners: interpreter and CIL ---
-    public static (object? ret, string stdout) RunInterpreter(
-        string src)
-    {
-        ProgramHir hir = BuildHir(src);
-        var interp = new Interpreter.Interpreter(hir);
-
-        var sb = new StringBuilder();
-        TextWriter old = Console.Out;
-        Console.SetOut(new StringWriter(sb));
-
-        try
-        {
-            object? ret = interp.Run();
-
-            return (ret, sb
-                .ToString()
-                .TrimEnd());
-        }
-        finally { Console.SetOut(old); }
-    }
-
-    public static (object? ret, string stdout) RunVm(
-        string src)
-    {
-        VmModule bytecode = BuildBytecode(src);
-        var virtualMachine = new VirtualMachine(bytecode);
-
-        var sb = new StringBuilder();
-        TextWriter old = Console.Out;
-        Console.SetOut(new StringWriter(sb));
-
-        try
-        {
-            Value ret = virtualMachine.Execute();
-
-            return (TryUnwrapVmValue(ret), sb
-                .ToString()
-                .TrimEnd());
-        }
-        finally { Console.SetOut(old); }
-    }
-
-    private static MiniLangParser CreateParser(
-        string src)
-    {
-        var str = new AntlrInputStream(src);
-        var lexer = new Frontend.MiniLangLexer(str);
-        var tokens = new CommonTokenStream(lexer);
-
-        return new MiniLangParser(tokens);
     }
 
     private static object? TryUnwrapVmValue(

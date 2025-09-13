@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 
 using Compiler.Backend.VM.Values;
@@ -9,31 +8,75 @@ public static class BuiltinsVm
 {
     public static Value Invoke(
         string name,
+        VmJitContext ctx,
+        Value[] args)
+    {
+        switch (name)
+        {
+            case "print":
+                return Print(args);
+            case "assert":
+                return Assert(args);
+            case "chr":
+                return Chr(args);
+            case "ord":
+                return Ord(args);
+            case "len":
+                return Len(args);
+            case "array":
+                return Array(
+                    ctx: ctx,
+                    args: args);
+            default:
+                throw new InvalidOperationException($"unknown builtin '{name}'");
+        }
+    }
+
+    private static Value Array(
+        VmJitContext ctx,
         ReadOnlySpan<Value> args)
     {
-        return name switch
+        if (args.Length is not (1 or 2))
         {
-            "print" => Print(args),
-            "clock_ms" => ClockMs(args),
-            "assert" => Assert(args),
-            "chr" => Chr(args),
-            "ord" => Ord(args),
-            _ => throw new InvalidOperationException($"unknown builtin '{name}'")
-        };
+            throw new InvalidOperationException("array(n[, init]) expects 1 or 2 args");
+        }
+
+        int n = (int)args[0]
+            .AsInt64();
+
+        VmArray arr = ctx.AllocArray(n);
+
+        if (args.Length == 2 && n > 0)
+        {
+            Value init = args[1];
+
+            for (int i = 0; i < n; i++)
+            {
+                arr[i] = init;
+            }
+        }
+
+        return Value.FromArray(arr);
     }
 
     private static Value Assert(
         ReadOnlySpan<Value> args)
     {
-        if (args.Length != 1)
+        if (args.Length < 1)
         {
-            throw new InvalidOperationException("assert(x) expects 1 arg");
+            throw new InvalidOperationException("assert(cond, msg?) requires at least 1 argument");
         }
 
-        if (!args[0]
-                .AsBool())
+        bool cond = ValueOps.ToBool(args[0]);
+
+        if (!cond)
         {
-            throw new InvalidOperationException("assert failed");
+            string msg = args.Length > 1
+                ? args[1]
+                    .ToString()
+                : "assertion failed";
+
+            throw new InvalidOperationException($"assert: {msg}");
         }
 
         return Value.Null;
@@ -50,15 +93,15 @@ public static class BuiltinsVm
             (char)args[0]
                 .AsInt64());
     }
-    private static Value ClockMs(
+    private static Value Len(
         ReadOnlySpan<Value> args)
     {
-        if (args.Length != 0)
+        if (args.Length != 1)
         {
-            throw new InvalidOperationException("clock_ms() expects 0 args");
+            throw new InvalidOperationException("len(x) expects 1 arg");
         }
 
-        return Value.FromLong(Stopwatch.GetTimestamp() * 1000 / Stopwatch.Frequency);
+        return ValueOps.Len(args[0]);
     }
 
     private static Value Ord(

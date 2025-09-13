@@ -12,7 +12,7 @@ public sealed class BackendVmFileTests(
     {
         TestUtils.RunAndAssertFile(
             path: path,
-            runner: TestUtils.RunVm,
+            runner: TestUtils.RunVmMirJit,
             log: testOutputHelper);
     }
 
@@ -23,7 +23,7 @@ public sealed class BackendVmFileTests(
     {
         string src = File.ReadAllText(path);
         (object? retExpected, string outExpected) = TestUtils.RunCil(src);
-        (object? retActual, string outActual) = TestUtils.RunVm(src);
+        (object? retActual, string outActual) = TestUtils.RunVmMirJit(src);
         TestUtils.AssertProgramResult(
             expectedRet: retExpected,
             expectedStdout: outExpected,

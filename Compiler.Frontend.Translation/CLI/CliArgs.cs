@@ -2,6 +2,8 @@ namespace Compiler.Frontend.Translation.CLI;
 
 public readonly record struct CliArgs(
     bool Verbose,
+    bool Quiet,
+    bool Time,
     string Path)
 {
     public static CliArgs Parse(
@@ -15,13 +17,23 @@ public readonly record struct CliArgs(
         }
 
         bool verbose = args.Any(a => a is "--verbose" or "-v");
-        string? file = args.FirstOrDefault(a => !a.StartsWith("-"));
+        bool quiet = args.Any(a => a.Equals(
+            value: "--quiet",
+            comparisonType: StringComparison.OrdinalIgnoreCase));
+
+        bool time = args.Any(a => a.Equals(
+            value: "--time",
+            comparisonType: StringComparison.OrdinalIgnoreCase));
+
+        string? file = args.FirstOrDefault(a => !a.StartsWith('-'));
         string path = string.IsNullOrWhiteSpace(file)
             ? defaultPath
             : file!;
 
         return new CliArgs(
             Verbose: verbose,
+            Quiet: quiet,
+            Time: time,
             Path: path);
     }
 
@@ -32,11 +44,9 @@ public readonly record struct CliArgs(
         Console.WriteLine("Options:");
         Console.WriteLine("  -h, --help            Show this help and exit");
         Console.WriteLine("  -v, --verbose         Verbose logs (parse, return value)");
-        Console.WriteLine();
-        Console.WriteLine("VM options (Compiler.Backend.VM):");
-        Console.WriteLine("  --vm-gc-threshold=N   Initial VM heap collection threshold (objects)");
-        Console.WriteLine("  --vm-gc-growth=X      VM threshold growth factor after GC (e.g., 1.5)");
-        Console.WriteLine("  --vm-gc-auto=on|off   Enable/disable opportunistic collections");
-        Console.WriteLine("  --vm-gc-stats         Print VM GC statistics after execution");
+        Console.WriteLine("      --quiet           Suppress program stdout (builtins like print)");
+        Console.WriteLine("      --time            Print total execution time (ms)");
+
+        // VM/GC flags are documented by host; CliArgs is backend-agnostic.
     }
 }

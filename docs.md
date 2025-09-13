@@ -1,31 +1,48 @@
 # MiniLang – Reference Manual
 
-MiniLang is a tiny, dynamically typed, C‑style language that drives a full pipeline: lexer → parser → HIR → MIR → backends (CLR and a custom VM), plus a tree‑walking interpreter. Program files use the extension `.minl`.
+MiniLang is a tiny, dynamically typed, C‑style language that drives a full pipeline: lexer → parser → HIR → MIR →
+backends (CLR and a custom VM), plus a tree‑walking interpreter. Program files use the extension `.minl`.
 
 ## Repository Structure
+
 - Solution: `Compiler.sln`
-- Projects: `Compiler.Frontend`, `Compiler.Frontend.Translation`, `Compiler.Interpreter`, `Compiler.Backend.CLR`, `Compiler.Backend.VM`, `Compiler.Tests`
+- Projects: `Compiler.Frontend`, `Compiler.Frontend.Translation`, `Compiler.Interpreter`, `Compiler.Backend.CLR`,
+  `Compiler.Backend.VM`, `Compiler.Tests`
 
 ## Build & Test
+
 - Build: `dotnet build Compiler.sln -c Debug`
 - Test: `dotnet test --collect:"XPlat Code Coverage"`
 - Format: `dotnet format`
 
 ## Run
+
 - Interpreter: `dotnet run --project Compiler.Interpreter [options] [file]`
-- VM backend: `dotnet run --project Compiler.Backend.VM [options] [file]`
-- CLR backend: `dotnet run --project Compiler.Backend.CLR [options] [file]`
+- CIL JIT (VM semantics): `dotnet run --project Compiler.Backend.JIT.CIL [options] [file]`
+- Native JIT (experimental): `dotnet run --project Compiler.Backend.JIT.Native [options] [file]`
 
 ### Common options
-- `-h|--help` show help; `-v|--verbose` verbose logs
+
+- `-h|--help` show help
+- `-v|--verbose` verbose logs (parse, return)
+- `--quiet` suppress program stdout (builtins like `print`)
+- `--time` print total execution time (ms)
 
 ### VM GC options
+
 - `--vm-gc-threshold=N` initial VM heap collection threshold (objects)
 - `--vm-gc-growth=X` threshold growth factor (e.g., 1.5)
 - `--vm-gc-auto=on|off` enable/disable opportunistic collections
 - `--vm-gc-stats` print VM GC statistics after execution
 
+### JITs
+
+- CIL JIT compiles MIR → IL and executes via CLR JIT. It implements VM semantics (Value/VmArray/Builtins) and integrates
+  with the VM GC.
+- Native JIT compiles MIR → x64 machine code (in progress), sharing the same VM runtime contracts.
+
 Example GC stats output
+
 ```
 [gc] mode=vm auto=on threshold=64 growth=1.5
 [gc] allocations=128 collections=3 live=10 peak_live=70
@@ -35,29 +52,29 @@ Example GC stats output
 
 ## 1 · Lexical structure
 
-| Token            | Example(s)            | Notes                                                             |
-|------------------|-----------------------|-------------------------------------------------------------------|
-| **Identifiers**  | `foo`, `bar42`        | ASCII letters / digits / `_`, must **not** start with a digit     |
-| **Integer lit.** | `0`, `-42`, `123456`  | 64-bit signed (`long`)                                            |
-| **Char lit.**    | `'a'`, `'\n'`, `'\\'` | Simple C-style escapes                                            |
-| **String lit.**  | `"hi"`, `"\"x\""`     | Back-slash escapes `\"` and `\\`                                  |
+| Token            | Example(s)                                                                                | Notes                                                         |
+|------------------|-------------------------------------------------------------------------------------------|---------------------------------------------------------------|
+| **Identifiers**  | `foo`, `bar42`                                                                            | ASCII letters / digits / `_`, must **not** start with a digit |
+| **Integer lit.** | `0`, `-42`, `123456`                                                                      | 64-bit signed (`long`)                                        |
+| **Char lit.**    | `'a'`, `'\n'`, `'\\'`                                                                     | Simple C-style escapes                                        |
+| **String lit.**  | `"hi"`, `"\"x\""`                                                                         | Back-slash escapes `\"` and `\\`                              |
 | **Keywords**     | `fn`, `var`, `if`, `else`, `while`, `for`, `break`, `continue`, `return`, `true`, `false` |
-| **Operators**    | `+ - * / % < <= > >= == != && || ! =`             | All left-associative                                               |
-| **Punctuation**  | `, ; ( ) { } [ ]`     |                                                                   |
-| **Comments**     | `// to end of line`   | Discarded by the lexer                                            |
+| **Operators**    | `+ - * / % < <= > >= == != &&                                                             |                                                               | ! =`             | All left-associative                                               |
+| **Punctuation**  | `, ; ( ) { } [ ]`                                                                         |                                                               |
+| **Comments**     | `// to end of line`                                                                       | Discarded by the lexer                                        |
 
 ---
 
 ## 2 · Types & values (run-time)
 
-| Tag    | Literal(s) | Description                                                     |
-|--------|------------|-----------------------------------------------------------------|
-| `long` | `42`       | 64-bit signed integer                                           |
-| `bool` | `true`     | Logical value                                                   |
-| `char` | `'x'`      | 16-bit Unicode scalar                                           |
-| `string` | `"foo"`  | Immutable UTF-16 sequence                                       |
-| `array`| —          | Mutable, zero-indexed `object?[]`, elements default to `null`   |
-| `null` | —          | Absence of a value                                              |
+| Tag      | Literal(s) | Description                                                   |
+|----------|------------|---------------------------------------------------------------|
+| `long`   | `42`       | 64-bit signed integer                                         |
+| `bool`   | `true`     | Logical value                                                 |
+| `char`   | `'x'`      | 16-bit Unicode scalar                                         |
+| `string` | `"foo"`    | Immutable UTF-16 sequence                                     |
+| `array`  | —          | Mutable, zero-indexed `object?[]`, elements default to `null` |
+| `null`   | —          | Absence of a value                                            |
 
 ---
 
@@ -79,8 +96,9 @@ Truthiness (used by `if`, `while`, …)
 
 * `bool` → itself
 * `long` → non‑zero
+* `string` → non‑empty
+* `array` → non‑empty
 * `null` → false
-* Strings/arrays: VM/CLR treat empty as false, non‑empty as true; interpreter treats any non‑null as true
 
 ---
 
@@ -114,8 +132,8 @@ fn gcd(a, b) {
 }
 ```
 
-* No overloading; a single global namespace of functions.  
-* If execution “falls off” the end, the function yields `null`.  
+* No overloading; a single global namespace of functions.
+* If execution “falls off” the end, the function yields `null`.
 * Exactly one entry function **`main()`** with zero parameters is required.
 
 ---
@@ -134,16 +152,15 @@ Indices are bounds‑checked; out‑of‑range access raises a runtime error.
 
 ## 7 · Built‑in functions
 
-| Name             | Arity   | Behaviour                                                                 |
-|------------------|---------|---------------------------------------------------------------------------|
-| `array(n)`       | 1       | Fresh array of length n (all elements `null`). VM lowers to `NewArr`.     |
-| `array(n, init)` | 2       | Interpreter/CLR only: fills with `init`. VM currently supports 1‑arg form |
-| `print(x, …)`    | varargs | Writes space‑separated values and a newline                                |
-| `len(x)`         | 1       | Length of string or array (returns `long`)                                 |
-| `ord(c)`         | 1       | Code point of `char` or 1‑length string (returns `long`)                  |
-| `chr(i)`         | 1       | `char` for integer code point (range‑checked)                              |
-| `assert(cond, msg?)` | 1–2 | Throws on false; optional message                                          |
-| `clock_ms()`     | 0       | Elapsed milliseconds (monotonic)                                           |
+| Name                 | Arity   | Behaviour                                                |
+|----------------------|---------|----------------------------------------------------------|
+| `array(n)`           | 1       | Fresh array of length n (all elements `null`).           |
+| `array(n, init)`     | 2       | Fills array with `init`.                                 |
+| `print(x, …)`        | varargs | Writes space‑separated values and a newline (to stdout)  |
+| `len(x)`             | 1       | Length of string or array (returns `long`)               |
+| `ord(c)`             | 1       | Code point of `char` or 1‑length string (returns `long`) |
+| `chr(i)`             | 1       | `char` for integer code point (range‑checked)            |
+| `assert(cond, msg?)` | 1–2     | Throws on false; optional message                        |
 
 ---
 

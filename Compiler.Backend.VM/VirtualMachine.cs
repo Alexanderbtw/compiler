@@ -1,349 +1,42 @@
-using Compiler.Backend.VM.Execution;
 using Compiler.Backend.VM.Execution.GC;
 using Compiler.Backend.VM.Options;
-using Compiler.Backend.VM.Translation;
 using Compiler.Backend.VM.Values;
 
 namespace Compiler.Backend.VM;
 
-public sealed class VirtualMachine(
-    VmModule module,
-    int stackSize = 1024,
-    GcOptions? options = null)
+/// <summary>
+///     Minimal VM runtime host for JIT execution: provides GC and roots management.
+///     No bytecode interpreter is present; MIR → IL JIT executes functions and uses
+///     these hooks to allocate arrays and expose GC roots.
+/// </summary>
+public sealed class VirtualMachine
 {
-    private readonly Stack<CallFrame> _callStack = new Stack<CallFrame>(32);
+    private readonly GcHeap _gcHeap;
 
-    private readonly GcHeap _gcHeap = new GcHeap(
-        initialThreshold: (options ?? GcOptions.Default).InitialThreshold,
-        growthFactor: (options ?? GcOptions.Default).GrowthFactor);
+    // Active JIT frames' locals used as GC roots
+    private readonly Stack<Value[]> _jitCallLocals = new Stack<Value[]>(32);
+    private readonly GcOptions _options;
 
-    private readonly Value[] _operandStack = new Value[stackSize];
-    private readonly GcOptions _options = options ?? GcOptions.Default;
-
-    private int _stackPointer;
-
-    public Value Execute(
-        string entryFunctionName = "main",
-        ReadOnlySpan<Value> arguments = default)
+    public VirtualMachine(
+        GcOptions? options = null)
     {
-        if (!module.TryGetFunctionIndex(
-                name: entryFunctionName,
-                idx: out int entryIndex))
+        _options = options ?? GcOptions.Default;
+        _gcHeap = new GcHeap(
+            initialThreshold: _options.InitialThreshold,
+            growthFactor: _options.GrowthFactor);
+    }
+
+    public VmArray AllocateArrayFromJit(
+        int length)
+    {
+        VmArray array = _gcHeap.AllocateArray(length);
+
+        if (_options.AutoCollect && _gcHeap.ShouldCollect())
         {
-            throw new InvalidOperationException($"entry '{entryFunctionName}' not found");
+            _gcHeap.Collect(EnumerateJitRoots());
         }
 
-        CallFrame currentFrame = CreateFrame(
-            functionIndex: entryIndex,
-            arguments: arguments);
-
-        while (true)
-        {
-            if (currentFrame.ProgramCounter < 0 || currentFrame.ProgramCounter >= currentFrame.Function.Code.Count)
-            {
-                throw new InvalidOperationException("PC out of range");
-            }
-
-            Instr instruction = currentFrame.Function.Code[currentFrame.ProgramCounter++];
-
-            switch (instruction.Op)
-            {
-                // constants / locals
-                case OpCode.LdcNull:
-                    PushValue(Value.Null);
-
-                    break;
-
-                case OpCode.LdcI64:
-                    PushValue(Value.FromLong(instruction.Imm));
-
-                    break;
-
-                case OpCode.LdcBool:
-                    PushValue(Value.FromBool(instruction.Imm != 0));
-
-                    break;
-
-                case OpCode.LdcChar:
-                    PushValue(Value.FromChar((char)instruction.Imm));
-
-                    break;
-
-                case OpCode.LdcStr:
-                    PushValue(Value.FromString(module.StringPool[instruction.Idx]));
-
-                    break;
-
-                case OpCode.LdLoc:
-                    PushValue(currentFrame.Locals[instruction.A]);
-
-                    break;
-
-                case OpCode.StLoc:
-                    currentFrame.Locals[instruction.A] = PopValue();
-
-                    break;
-
-                case OpCode.Pop:
-                    PopValue();
-
-                    break;
-
-                // arithmetic / logic
-                case OpCode.Add:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromLong(left.AsInt64() + right.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Sub:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromLong(left.AsInt64() - right.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Mul:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromLong(left.AsInt64() * right.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Div:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromLong(left.AsInt64() / right.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Mod:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromLong(left.AsInt64() % right.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Neg:
-                    {
-                        Value value = PopValue();
-                        PushValue(Value.FromLong(-value.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Not:
-                    {
-                        Value value = CoerceToBoolean(PopValue());
-                        PushValue(Value.FromBool(!value.AsBool()));
-
-                        break;
-                    }
-
-                case OpCode.Eq:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(
-                            Value.FromBool(
-                                AreValuesEqual(
-                                    a: left,
-                                    b: right)));
-
-                        break;
-                    }
-                case OpCode.Ne:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(
-                            Value.FromBool(
-                                !AreValuesEqual(
-                                    a: left,
-                                    b: right)));
-
-                        break;
-                    }
-                case OpCode.Lt:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromBool(left.AsInt64() < right.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Le:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromBool(left.AsInt64() <= right.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Gt:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromBool(left.AsInt64() > right.AsInt64()));
-
-                        break;
-                    }
-                case OpCode.Ge:
-                    {
-                        Value right = PopValue();
-                        Value left = PopValue();
-                        PushValue(Value.FromBool(left.AsInt64() >= right.AsInt64()));
-
-                        break;
-                    }
-
-                // arrays
-                case OpCode.LdElem:
-                    {
-                        int elementIndex = (int)PopValue()
-                            .AsInt64();
-
-                        VmArray array = PopValue()
-                            .AsArray();
-
-                        PushValue(array[elementIndex]);
-
-                        break;
-                    }
-                case OpCode.StElem:
-                    {
-                        Value value = PopValue();
-                        int elementIndex = (int)PopValue()
-                            .AsInt64();
-
-                        VmArray array = PopValue()
-                            .AsArray();
-
-                        array[elementIndex] = value;
-
-                        break;
-                    }
-
-                // control flow
-                case OpCode.Br:
-                    currentFrame.ProgramCounter = instruction.A;
-
-                    break;
-
-                case OpCode.BrTrue:
-                    if (CoerceToBoolean(PopValue())
-                        .AsBool())
-                    {
-                        currentFrame.ProgramCounter = instruction.A;
-                    }
-
-                    break;
-
-                case OpCode.Ret:
-                    {
-                        Value returnValue = PopValue();
-
-                        if (_callStack.Count == 0)
-                        {
-                            return returnValue;
-                        }
-
-                        currentFrame = _callStack.Pop(); // restore caller
-                        PushValue(returnValue);
-
-                        break;
-                    }
-
-                // calls
-                case OpCode.NewArr:
-                    {
-                        int length = (int)PopValue()
-                            .AsInt64();
-
-                        VmArray array = _gcHeap.AllocateArray(length);
-                        PushValue(Value.FromArray(array));
-
-                        // Opportunistic collection if threshold exceeded
-                        if (_options.AutoCollect && _gcHeap.ShouldCollect())
-                        {
-                            _gcHeap.Collect(EnumerateRoots(currentFrame));
-                        }
-
-                        break;
-                    }
-                case OpCode.Len:
-                    {
-                        Value value = PopValue();
-
-                        switch (value.Tag)
-                        {
-                            case ValueTag.String:
-                                PushValue(
-                                    Value.FromLong(
-                                        value.AsString()
-                                            .Length));
-
-                                break;
-                            case ValueTag.Array:
-                                PushValue(
-                                    Value.FromLong(
-                                        value.AsArray()
-                                            .Length));
-
-                                break;
-                            default:
-                                throw new InvalidOperationException("len: unsupported type");
-                        }
-
-                        break;
-                    }
-                case OpCode.CallUser:
-                    {
-                        // Pop args (rightmost at stack top), pass in the order of function parameters
-                        int argumentCount = instruction.B;
-                        var callArguments = new Value[argumentCount];
-
-                        for (int index = argumentCount - 1; index >= 0; --index)
-                        {
-                            callArguments[index] = PopValue();
-                        }
-
-                        _callStack.Push(currentFrame); // save caller
-                        currentFrame = CreateFrame(
-                            functionIndex: instruction.A,
-                            arguments: callArguments);
-
-                        break;
-                    }
-                case OpCode.CallBuiltin:
-                    {
-                        int argumentCount = instruction.B;
-                        var callArguments = new Value[argumentCount];
-
-                        for (int index = argumentCount - 1; index >= 0; --index)
-                        {
-                            callArguments[index] = PopValue();
-                        }
-
-                        string builtinName = module.StringPool[instruction.A];
-                        Value result = BuiltinsVm.Invoke(
-                            name: builtinName,
-                            args: callArguments);
-
-                        PushValue(result);
-
-                        break;
-                    }
-
-                default:
-                    throw new NotSupportedException(instruction.Op.ToString());
-            }
-        }
+        return array;
     }
 
     public GcStats GetGcStats()
@@ -351,126 +44,25 @@ public sealed class VirtualMachine(
         return _gcHeap.GetStats();
     }
 
-    private static bool AreValuesEqual(
-        Value a,
-        Value b)
+    public void JitEnterFunction(
+        Value[] locals)
     {
-        if (a.Tag != b.Tag)
-        {
-            // attempt to compare i64 with char as numbers
-            if (a.Tag == ValueTag.I64 && b.Tag == ValueTag.Char)
-            {
-                return a.AsInt64() == b.Char;
-            }
-
-            if (a.Tag == ValueTag.Char && b.Tag == ValueTag.I64)
-            {
-                return a.Char == b.AsInt64();
-            }
-
-            return false;
-        }
-
-        return a.Tag switch
-        {
-            ValueTag.Null => true,
-            ValueTag.I64 => a.AsInt64() == b.AsInt64(),
-            ValueTag.Bool => a.AsBool() == b.AsBool(),
-            ValueTag.Char => a.Char == b.Char,
-            ValueTag.String => a.AsString() == b.AsString(),
-            ValueTag.Array => ReferenceEquals(
-                objA: a.Ref,
-                objB: b.Ref),
-            _ => Equals(
-                objA: a.Ref,
-                objB: b.Ref)
-        };
+        _jitCallLocals.Push(locals);
     }
 
-    private static Value CoerceToBoolean(
-        Value value)
+    public void JitExitFunction()
     {
-        return value.Tag switch
-        {
-            ValueTag.Bool => value,
-            ValueTag.Null => Value.FromBool(false),
-            ValueTag.I64 => Value.FromBool(value.AsInt64() != 0),
-            ValueTag.Char => Value.FromBool(value.Char != '\0'),
-            ValueTag.String => Value.FromBool(!string.IsNullOrEmpty(value.AsString())),
-            ValueTag.Array => Value.FromBool(
-                value.AsArray()
-                    .Length != 0),
-            _ => Value.FromBool(value.Ref is not null)
-        };
+        _jitCallLocals.Pop();
     }
 
-    private CallFrame CreateFrame(
-        int functionIndex,
-        ReadOnlySpan<Value> arguments)
+    private IEnumerable<Value> EnumerateJitRoots()
     {
-        VmFunction function = module.Functions[functionIndex];
-
-        if (arguments.Length != function.Arity)
+        foreach (Value[] frameLocals in _jitCallLocals)
         {
-            throw new InvalidOperationException($"{function.Name} expects {function.Arity} args, got {arguments.Length}");
-        }
-
-        var frame = new CallFrame
-        {
-            Function = function,
-            Locals = new Value[function.NLocals],
-            ProgramCounter = 0
-        };
-
-        // place parameters into their local slots
-        for (int i = 0; i < function.Arity; i++)
-        {
-            frame.Locals[function.ParamLocalIndices[i]] = arguments[i];
-        }
-
-        return frame;
-    }
-
-    private IEnumerable<Value> EnumerateRoots(
-        CallFrame currentFrame)
-    {
-        // Operand stack roots
-        for (int i = 0; i < _stackPointer; i++)
-        {
-            yield return _operandStack[i];
-        }
-
-        // Current frame locals
-        foreach (Value v in currentFrame.Locals)
-        {
-            yield return v;
-        }
-
-        // Other call frames' locals (walk the call stack without mutating it)
-        foreach (CallFrame frame in _callStack)
-        {
-            foreach (Value v in frame.Locals)
+            foreach (Value v in frameLocals)
             {
                 yield return v;
             }
         }
-    }
-
-    private Value PopValue()
-    {
-        return _operandStack[--_stackPointer];
-    }
-
-    private void PushValue(
-        Value value)
-    {
-        _operandStack[_stackPointer++] = value;
-    }
-
-    private struct CallFrame
-    {
-        public VmFunction Function;
-        public Value[] Locals;
-        public int ProgramCounter;
     }
 }

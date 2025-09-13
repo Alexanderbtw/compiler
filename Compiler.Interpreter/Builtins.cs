@@ -141,7 +141,10 @@ public static class Builtins
         {
             bool b => b,
             long n => n != 0,
-            _ => v != null
+            string s => s.Length != 0,
+            Array arr => arr.Length != 0,
+            null => false,
+            _ => true
         };
     }
 
@@ -194,11 +197,6 @@ public static class Builtins
 
                     throw new RuntimeException($"assert: {msg}");
                 }
-
-                return true;
-
-            case "clock_ms":
-                result = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
                 return true;
 
