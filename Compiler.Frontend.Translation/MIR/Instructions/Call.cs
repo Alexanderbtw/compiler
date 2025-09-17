@@ -1,8 +1,12 @@
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Frontend.Translation.MIR.Operands;
+using Compiler.Frontend.Translation.MIR.Operands.Abstractions;
 
 namespace Compiler.Frontend.Translation.MIR.Instructions;
 
+/// <summary>
+///     Call a function by name. Dst is optional (for procedures).
+/// </summary>
 public sealed record Call(
     VReg? Dst,
     string Callee,

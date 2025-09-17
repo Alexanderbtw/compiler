@@ -47,7 +47,7 @@ interpreter.
 
 - Interpreter: `dotnet run --project Compiler.Interpreter [options] [file]`
 - CIL JIT (VM semantics): `dotnet run --project Compiler.Backend.JIT.CIL [options] [file]`
-- Native JIT (experimental): `dotnet run --project Compiler.Backend.JIT.Native [options] [file]`
+- LLVM JIT (experimental): `dotnet run --project Compiler.Backend.JIT.LLVM [options] [file]`
 
 Common options
 
@@ -55,6 +55,9 @@ Common options
 - `-v|--verbose` verbose logs (parse, return value)
 - `--quiet` suppress program stdout (builtins like `print`)
 - `--time` print total execution time (ms)
+  LLVM JIT options
+
+- `--dump-ir` (alias `-S`) print generated LLVM IR before execution
 
 VM GC options
 
@@ -69,6 +72,16 @@ JITs
   CLR object model.
 - The Native JIT compiles MIR → x64 machine code (work in progress). Both JITs share the same VM runtime and GC
   integration.
+
+LLVM JIT prerequisites
+
+- Install native LLVM on your system (LLVMSharp P/Invokes libLLVM):
+    - macOS (Homebrew): `brew install llvm`
+        - The JIT preloads Homebrew LLVM from `$(HOMEBREW_PREFIX)/opt/llvm/lib/libLLVM.dylib`.
+        - If needed, set `LIBLLVM_PATH` to the full path of `libLLVM.dylib`.
+    - Linux: install your distro’s `llvm` development package (the code tries common `libLLVM.so` locations).
+    - Windows: ensure `libLLVM.dll`/`LLVM-C.dll` is on `PATH`.
+    - As an alternative on macOS, you can export `DYLD_FALLBACK_LIBRARY_PATH` to include your LLVM `lib` directory.
 
 Example GC stats output
 

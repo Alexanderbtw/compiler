@@ -7,9 +7,13 @@ using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Frontend.Translation.MIR.Operands;
+using Compiler.Frontend.Translation.MIR.Operands.Abstractions;
 
 namespace Compiler.Frontend.Translation.MIR;
 
+/// <summary>
+///     HIR → MIR lowering
+/// </summary>
 public sealed class HirToMir
 {
     public MirModule Lower(
@@ -205,10 +209,7 @@ public sealed class HirToMir
             stmt: function.Body);
 
         // Ensure the last active block has a terminator
-        if (context.CurrentBlock.Terminator is null)
-        {
-            context.CurrentBlock.Terminator = new Ret(null);
-        }
+        context.CurrentBlock.Terminator ??= new Ret(null);
 
         context.PopScope();
 
@@ -381,10 +382,7 @@ public sealed class HirToMir
                         context: context,
                         stmt: ifStmt.Then);
 
-                    if (context.CurrentBlock.Terminator is null)
-                    {
-                        context.CurrentBlock.Terminator = new Br(joinBlock);
-                    }
+                    context.CurrentBlock.Terminator ??= new Br(joinBlock);
 
                     // else
                     if (ifStmt.Else is not null)
@@ -394,10 +392,7 @@ public sealed class HirToMir
                             context: context,
                             stmt: ifStmt.Else);
 
-                        if (context.CurrentBlock.Terminator is null)
-                        {
-                            context.CurrentBlock.Terminator = new Br(joinBlock);
-                        }
+                        context.CurrentBlock.Terminator ??= new Br(joinBlock);
                     }
 
                     // continue at join
@@ -431,10 +426,7 @@ public sealed class HirToMir
                         context: context,
                         stmt: whileStmt.Body);
 
-                    if (context.CurrentBlock.Terminator is null)
-                    {
-                        context.CurrentBlock.Terminator = new Br(headBlock);
-                    }
+                    context.CurrentBlock.Terminator ??= new Br(headBlock);
 
                     context.LoopTargets.Pop();
                     context.CurrentBlock = exitBlock;
@@ -494,13 +486,13 @@ public sealed class HirToMir
         public MirFunction CurrentFunction = null!;
         public readonly Stack<(MirBlock BreakTarget, MirBlock ContinueTarget)> LoopTargets = new Stack<(MirBlock BreakTarget, MirBlock ContinueTarget)>();
         public readonly MirModule Module = new MirModule();
-        public readonly Stack<Dictionary<string, VReg?>> Scopes = new Stack<Dictionary<string, VReg?>>();
+        private readonly Stack<Dictionary<string, VReg?>> _scopes = new Stack<Dictionary<string, VReg?>>();
 
         public VReg DefineVariable(
             string name)
         {
             VReg reg = CurrentFunction.NewTemp();
-            Scopes
+            _scopes
                 .Peek()[name] = reg;
 
             return reg;
@@ -508,19 +500,19 @@ public sealed class HirToMir
 
         public void PopScope()
         {
-            Scopes.Pop();
+            _scopes.Pop();
         }
 
         public void PushScope()
         {
-            Scopes.Push(new Dictionary<string, VReg?>());
+            _scopes.Push(new Dictionary<string, VReg?>());
         }
 
         public bool TryGetVariableRegister(
             string name,
             out VReg? reg)
         {
-            foreach (Dictionary<string, VReg?> scope in Scopes)
+            foreach (Dictionary<string, VReg?> scope in _scopes)
             {
                 if (scope.TryGetValue(
                         key: name,
@@ -530,7 +522,7 @@ public sealed class HirToMir
                 }
             }
 
-            reg = null!;
+            reg = null;
 
             return false;
         }

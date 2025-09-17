@@ -5,15 +5,15 @@ using Compiler.Backend.VM.Values;
 namespace Compiler.Backend.VM;
 
 /// <summary>
-///     Minimal VM runtime host for JIT execution: provides GC and roots management.
-///     No bytecode interpreter is present; MIR → IL JIT executes functions and uses
-///     these hooks to allocate arrays and expose GC roots.
+///     Minimal runtime host for JIT execution.
+///     Holds the GC, tracks JIT frames as roots, and allocates VM arrays on demand.
 /// </summary>
 public sealed class VirtualMachine
 {
+    private readonly List<Func<IEnumerable<Value>>> _externalRootsProviders = [];
     private readonly GcHeap _gcHeap;
 
-    // Active JIT frames' locals used as GC roots
+    // Active JIT frames locals used as GC roots
     private readonly Stack<Value[]> _jitCallLocals = new Stack<Value[]>(32);
     private readonly GcOptions _options;
 
@@ -33,7 +33,7 @@ public sealed class VirtualMachine
 
         if (_options.AutoCollect && _gcHeap.ShouldCollect())
         {
-            _gcHeap.Collect(EnumerateJitRoots());
+            _gcHeap.Collect(EnumerateAllRoots());
         }
 
         return array;
@@ -55,14 +55,27 @@ public sealed class VirtualMachine
         _jitCallLocals.Pop();
     }
 
-    private IEnumerable<Value> EnumerateJitRoots()
+    public void RegisterExternalRootsProvider(
+        Func<IEnumerable<Value>> provider)
     {
-        foreach (Value[] frameLocals in _jitCallLocals)
+        if (provider is null)
         {
-            foreach (Value v in frameLocals)
-            {
-                yield return v;
-            }
+            throw new ArgumentNullException(nameof(provider));
+        }
+
+        _externalRootsProviders.Add(provider);
+    }
+
+    private IEnumerable<Value> EnumerateAllRoots()
+    {
+        foreach (Value v in _jitCallLocals.SelectMany(frameLocals => frameLocals))
+        {
+            yield return v;
+        }
+
+        foreach (Value v in _externalRootsProviders.SelectMany(provider => provider()))
+        {
+            yield return v;
         }
     }
 }

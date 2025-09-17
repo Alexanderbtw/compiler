@@ -1,5 +1,8 @@
 namespace Compiler.Frontend.Translation.HIR.Metadata;
 
+/// <summary>
+///     Flags describing builtin behavior (purity, foldability, arity behavior).
+/// </summary>
 [Flags]
 public enum BuiltinAttr
 {

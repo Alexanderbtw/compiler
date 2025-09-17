@@ -7,7 +7,7 @@ public sealed class GcCliParseTests
     [Fact]
     public void Defaults_When_No_Flags()
     {
-        (GcOptions o, bool stats) = GcCli.ParseFromArgs([]);
+        (GcOptions o, bool stats) = GcCliArgs.Parse([]);
         Assert.True(o.AutoCollect);
         Assert.Equal(
             expected: 1024,
@@ -31,7 +31,7 @@ public sealed class GcCliParseTests
             "--vm-gc-stats"
         ];
 
-        (GcOptions o, bool stats) = GcCli.ParseFromArgs(args);
+        (GcOptions o, bool stats) = GcCliArgs.Parse(args);
         Assert.False(o.AutoCollect);
         Assert.Equal(
             expected: 64,
@@ -69,7 +69,7 @@ public sealed class GcCliParseTests
         bool expected)
     {
         string[] args = ["--vm-gc-auto=" + val];
-        (GcOptions o, _) = GcCli.ParseFromArgs(args);
+        (GcOptions o, _) = GcCliArgs.Parse(args);
         Assert.Equal(
             expected: expected,
             actual: o.AutoCollect);

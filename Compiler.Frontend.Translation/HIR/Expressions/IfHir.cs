@@ -4,6 +4,9 @@ using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR.Expressions;
 
+/// <summary>
+///     If/else expression with optional else branch.
+/// </summary>
 public sealed record IfHir(
     ExprHir Cond,
     StmtHir Then,

@@ -3,13 +3,14 @@ using Compiler.Frontend.Translation.MIR.Operands;
 
 namespace Compiler.Frontend.Translation.MIR.Common;
 
-public sealed class MirFunction
+/// <summary>
+///     function container for MIR
+/// </summary>
+public sealed class MirFunction(
+    string name)
 {
-    public MirFunction(
-        string name)
-    {
-        Name = name;
-    }
+    private readonly List<MirBlock> _blocks = [];
+    private int _nextTempId;
 
     public enum MType
     {
@@ -19,17 +20,13 @@ public sealed class MirFunction
         Char = 3
     }
 
-    public List<MirBlock> Blocks { get; } = [];
+    public IReadOnlyList<MirBlock> Blocks => _blocks;
 
-    public string Name { get; }
+    public string Name { get; } = name;
 
-    public int NextTempId { get; set; }
+    public List<string> ParamNames { get; } = [];
 
-    public Dictionary<string, VReg> Parameters { get; } = new Dictionary<string, VReg>();
-
-    public List<string> ParamNames { get; } = new List<string>();
-
-    public List<VReg> ParamRegs { get; } = new List<VReg>();
+    public List<VReg> ParamRegs { get; } = [];
 
     // Minimal type info for virtual registers (filled by MirTypeAnnotator)
     public Dictionary<int, MType> Types { get; } = new Dictionary<int, MType>();
@@ -38,14 +35,14 @@ public sealed class MirFunction
         string name)
     {
         var b = new MirBlock(name);
-        Blocks.Add(b);
+        _blocks.Add(b);
 
         return b;
     }
 
     public VReg NewTemp()
     {
-        return new VReg(++NextTempId);
+        return new VReg(++_nextTempId);
     }
 
     public override string ToString()

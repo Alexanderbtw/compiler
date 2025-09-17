@@ -6,6 +6,9 @@ public sealed class InterpreterFileTests(
     ITestOutputHelper testOutputHelper)
 {
     [Theory]
+    [Trait(
+        name: "Category",
+        value: "Tasks")]
     [ProgramFilesData]
     public void Interpreter_Executes_File(
         string path)

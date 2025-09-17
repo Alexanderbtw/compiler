@@ -4,6 +4,7 @@ using System.Text;
 using Antlr4.Runtime;
 
 using Compiler.Backend.JIT.CIL;
+using Compiler.Backend.JIT.LLVM;
 using Compiler.Backend.VM;
 using Compiler.Backend.VM.Values;
 using Compiler.Frontend;
@@ -20,6 +21,8 @@ using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 
+using LLVMSharp.Interop;
+
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
@@ -27,8 +30,6 @@ namespace Compiler.Tests;
 
 internal static class TestUtils
 {
-    // --- Constants / configuration ---
-    // Declared here (default program directories)
     private static readonly string[] DefaultProgramDirs =
     [
         Path.Combine(
@@ -55,7 +56,6 @@ internal static class TestUtils
         }
     }
 
-    // --- Unified assertions for interpreter / backend runs ---
     public static void AssertProgramResult(
         object? expectedRet,
         string? expectedStdout,
@@ -121,9 +121,6 @@ internal static class TestUtils
         new SemanticChecker().Check(hir); // must not throw
     }
 
-    // Bytecode layer removed: no BuildBytecode.
-
-    // --- Unified IR build pipeline ---
     public static ProgramHir BuildHir(
         string src)
     {
@@ -143,7 +140,6 @@ internal static class TestUtils
         return new HirToMir().Lower(hir);
     }
 
-    // --- Discover program files for [Theory] ---
     public static IEnumerable<object[]> EnumerateProgramFiles()
     {
         string dir = GetProgramsDir();
@@ -214,53 +210,6 @@ internal static class TestUtils
             log: log);
     }
 
-    public static void RunAndAssertSource(
-        string src,
-        Func<string, (object? ret, string stdout)> runner,
-        string? pathForExpectations = null,
-        ITestOutputHelper? log = null)
-    {
-        (object? expRet, string? expOut) = pathForExpectations is null
-            ? (null, null)
-            : ReadExpectations(
-                programPath: pathForExpectations,
-                src: src);
-
-        (object? ret, string stdout) = runner(src);
-        AssertProgramResult(
-            expectedRet: expRet,
-            expectedStdout: expOut,
-            actualRet: ret,
-            actualStdout: stdout,
-            log: log);
-    }
-
-    public static (object? ret, string stdout) RunCil(
-        string src)
-    {
-        MirModule mir = BuildMir(src);
-        var vm = new VirtualMachine();
-        var backend = new MirJitCil();
-
-        var sb = new StringBuilder();
-        TextWriter old = Console.Out;
-        Console.SetOut(new StringWriter(sb));
-
-        try
-        {
-            Value v = backend.Execute(
-                vm: vm,
-                module: mir,
-                entry: "main");
-
-            return (TryUnwrapVmValue(v), sb
-                .ToString()
-                .TrimEnd());
-        }
-        finally { Console.SetOut(old); }
-    }
-
-    // --- Runners: interpreter and CIL ---
     public static (object? ret, string stdout) RunInterpreter(
         string src)
     {
@@ -282,7 +231,33 @@ internal static class TestUtils
         finally { Console.SetOut(old); }
     }
 
-    // VM interpreter removed: use MIR JIT runners instead.
+    public static (object? ret, string stdout) RunLlvmJit(
+        string src)
+    {
+        MirModule mir = BuildMir(src);
+        var vm = new VirtualMachine();
+
+        var sb = new StringBuilder();
+        TextWriter old = Console.Out;
+        Console.SetOut(new StringWriter(sb));
+
+        try
+        {
+            var emitter = new LlvmEmitter();
+            LLVMModuleRef module = emitter.EmitModule(mir);
+
+            var jit = new MirJitLlvm();
+            Value v = jit.ExecuteModule(
+                virtualMachine: vm,
+                module: module,
+                entryFunctionName: "main");
+
+            return (TryUnwrapVmValue(v), sb
+                .ToString()
+                .TrimEnd());
+        }
+        finally { Console.SetOut(old); }
+    }
 
     public static (object? ret, string stdout) RunVmMirJit(
         string src)
@@ -298,9 +273,9 @@ internal static class TestUtils
         {
             var jit = new MirJitCil();
             Value v = jit.Execute(
-                vm: vm,
-                module: mir,
-                entry: "main");
+                virtualMachine: vm,
+                mirModule: mir,
+                entryFunctionName: "main");
 
             return (TryUnwrapVmValue(v), sb
                 .ToString()
@@ -407,8 +382,6 @@ internal static class TestUtils
                 break;
         }
     }
-
-    // Bytecode JIT removed: use RunVmMirJit instead.
 
     private static MiniLangParser CreateParser(
         string src)
@@ -570,9 +543,6 @@ internal static class TestUtils
         throw new FormatException($"Unsupported RET format: '{text}'");
     }
 
-    // --- Expectations (RET/STDOUT) ---
-    // sidecar: <file>.ret / <file>.out  (optional)
-    // inline:  // RET: <value>     // STDOUT: <text>  (or // EXPECT:)
     private static (object? expectedRet, string? expectedStdout) ReadExpectations(
         string programPath,
         string src)
@@ -641,7 +611,7 @@ internal static class TestUtils
                 ValueTag.Char => value.AsChar(),
                 ValueTag.String => value.AsString(),
                 ValueTag.Array => VmArrayToHostArray(value.AsArray()),
-                ValueTag.Object => value.Ref, // unwrap boxed reference
+                ValueTag.Object => value.Ref,
                 _ => throw new ArgumentOutOfRangeException()
             },
             _ => v
@@ -662,7 +632,6 @@ internal static class TestUtils
     }
 }
 
-// xUnit DataAttribute for file-based programs: [ProgramFilesData]
 [AttributeUsage(AttributeTargets.Method)]
 internal sealed class ProgramFilesDataAttribute : DataAttribute
 {

@@ -1,5 +1,9 @@
 namespace Compiler.Frontend.Translation.CLI;
 
+/// <summary>
+///     Shared CLI flags used by tools (Interpreter, JIT hosts).
+///     Picks the first non-flag arg as the input path.
+/// </summary>
 public readonly record struct CliArgs(
     bool Verbose,
     bool Quiet,
@@ -10,12 +14,6 @@ public readonly record struct CliArgs(
         string[] args,
         string defaultPath = "main.minl")
     {
-        if (args.Any(a => a is "--help" or "-h"))
-        {
-            PrintUsage();
-            Environment.Exit(0);
-        }
-
         bool verbose = args.Any(a => a is "--verbose" or "-v");
         bool quiet = args.Any(a => a.Equals(
             value: "--quiet",
@@ -35,18 +33,5 @@ public readonly record struct CliArgs(
             Quiet: quiet,
             Time: time,
             Path: path);
-    }
-
-    private static void PrintUsage()
-    {
-        string exe = AppDomain.CurrentDomain.FriendlyName;
-        Console.WriteLine($"Usage: {exe} [options] [file]\n");
-        Console.WriteLine("Options:");
-        Console.WriteLine("  -h, --help            Show this help and exit");
-        Console.WriteLine("  -v, --verbose         Verbose logs (parse, return value)");
-        Console.WriteLine("      --quiet           Suppress program stdout (builtins like print)");
-        Console.WriteLine("      --time            Print total execution time (ms)");
-
-        // VM/GC flags are documented by host; CliArgs is backend-agnostic.
     }
 }

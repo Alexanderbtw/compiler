@@ -1,10 +1,14 @@
 namespace Compiler.Backend.VM.Values;
 
+/// <summary>
+///     Tiny tagged union for VM values.
+///     Keeps primitives inline and uses <see cref="Ref" /> for strings/arrays/objects.
+/// </summary>
 public readonly struct Value
 {
-    public readonly bool Bool;
-    public readonly char Char;
-    public readonly long Int64;
+    private readonly bool _bool;
+    private readonly char _char;
+    private readonly long _int64;
 
     public static readonly Value Null = new Value(
         tag: ValueTag.Null,
@@ -24,9 +28,9 @@ public readonly struct Value
         object? r)
     {
         Tag = tag;
-        Int64 = int64;
-        Bool = b;
-        Char = c;
+        _int64 = int64;
+        _bool = b;
+        _char = c;
         Ref = r;
     }
     public VmArray AsArray()
@@ -39,21 +43,21 @@ public readonly struct Value
     public bool AsBool()
     {
         return Tag == ValueTag.Bool
-            ? Bool
+            ? _bool
             : throw new InvalidOperationException("not bool");
     }
 
     public char AsChar()
     {
         return Tag == ValueTag.Char
-            ? Char
+            ? _char
             : throw new InvalidOperationException("not char");
     }
 
     public long AsInt64()
     {
         return Tag == ValueTag.I64
-            ? Int64
+            ? _int64
             : throw new InvalidOperationException("not i64");
     }
     public string AsString()
@@ -143,11 +147,11 @@ public readonly struct Value
         return Tag switch
         {
             ValueTag.Null => "null",
-            ValueTag.I64 => Int64.ToString(),
-            ValueTag.Bool => Bool
+            ValueTag.I64 => _int64.ToString(),
+            ValueTag.Bool => _bool
                 ? "true"
                 : "false",
-            ValueTag.Char => Char.ToString(),
+            ValueTag.Char => _char.ToString(),
             ValueTag.String => (string)Ref!,
             ValueTag.Array => "[array]",
             _ => Ref?.ToString() ?? "null"

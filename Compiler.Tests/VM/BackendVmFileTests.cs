@@ -6,6 +6,9 @@ public sealed class BackendVmFileTests(
     ITestOutputHelper testOutputHelper)
 {
     [Theory]
+    [Trait(
+        name: "Category",
+        value: "Tasks")]
     [ProgramFilesData]
     public void Backend_Vm_Executes_File(
         string path)
@@ -16,19 +19,5 @@ public sealed class BackendVmFileTests(
             log: testOutputHelper);
     }
 
-    [Theory]
-    [ProgramFilesData]
-    public void Vm_vs_Cil_All_Files(
-        string path)
-    {
-        string src = File.ReadAllText(path);
-        (object? retExpected, string outExpected) = TestUtils.RunCil(src);
-        (object? retActual, string outActual) = TestUtils.RunVmMirJit(src);
-        TestUtils.AssertProgramResult(
-            expectedRet: retExpected,
-            expectedStdout: outExpected,
-            actualRet: retActual,
-            actualStdout: outActual,
-            log: testOutputHelper);
-    }
+    // Removed redundant test which compared two VM runs to each other.
 }

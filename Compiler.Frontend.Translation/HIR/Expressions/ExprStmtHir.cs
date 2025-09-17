@@ -4,6 +4,9 @@ using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR.Expressions;
 
+/// <summary>
+///     Expression statement (discard result or void call).
+/// </summary>
 public sealed record ExprStmtHir(
     ExprHir? Expr,
     SourceSpan Span) : StmtHir(Span)

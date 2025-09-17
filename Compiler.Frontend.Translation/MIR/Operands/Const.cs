@@ -1,3 +1,5 @@
+using Compiler.Frontend.Translation.MIR.Operands.Abstractions;
+
 namespace Compiler.Frontend.Translation.MIR.Operands;
 
 public sealed record Const(

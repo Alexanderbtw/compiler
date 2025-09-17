@@ -3,8 +3,7 @@ using Compiler.Backend.VM.Values;
 namespace Compiler.Backend.VM.Execution;
 
 /// <summary>
-///     Per-execution VM context for JITted functions. Provides GC root tracking, VM-managed allocation,
-///     and a function table for user-defined function calls.
+///     Per-execution VM context for JITted code
 /// </summary>
 public delegate Value VmJitFunc(
     VmJitContext ctx,

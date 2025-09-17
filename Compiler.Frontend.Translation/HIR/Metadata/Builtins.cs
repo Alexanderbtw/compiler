@@ -4,6 +4,9 @@ using static BuiltinAttr;
 
 using static BuiltinLoweringKind;
 
+/// <summary>
+///     Frontend catalog of builtins: name → descriptors (arity, attributes, lowering route).
+/// </summary>
 public static class Builtins
 {
     // name -> overloads (future-proof)

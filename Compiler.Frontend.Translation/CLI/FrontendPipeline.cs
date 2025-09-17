@@ -8,6 +8,10 @@ using Compiler.Frontend.Translation.MIR.Common;
 
 namespace Compiler.Frontend.Translation.CLI;
 
+/// <summary>
+///     Thin orchestrator from source text to HIR/MIR.
+///     Adds ANTLR error listeners, runs the semantic checker, then MIR lowering and light MIR passes.
+/// </summary>
 public static class FrontendPipeline
 {
     public static ProgramHir BuildHir(
@@ -31,16 +35,12 @@ public static class FrontendPipeline
         {
             if (listenerLexer.HadError || listenerParser.HadError)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Parse failed");
+                Console.Error.WriteLine("Parse failed");
             }
             else
             {
-                Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("Parse succeeded");
             }
-
-            Console.ResetColor();
         }
 
         new SemanticChecker().Check(hir);
@@ -54,7 +54,7 @@ public static class FrontendPipeline
         MirModule mir = new HirToMir().Lower(hir);
 
         new MirSimplifier().Run(mir);
-        new MirTypeAnnotator().Annotate(mir);
+        // new MirTypeAnnotator().Annotate(mir);
 
         return mir;
     }

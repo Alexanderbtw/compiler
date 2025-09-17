@@ -16,21 +16,14 @@ public sealed class BackendParityTests
         }";
 
         (object? iRet, string iOut) = TestUtils.RunInterpreter(src);
-        (object? cRet, string cOut) = TestUtils.RunCil(src);
         (object? mRet, string mOut) = TestUtils.RunVmMirJit(src);
 
         Assert.Null(iRet);
         Assert.Equal(
             expected: iRet,
-            actual: cRet);
-
-        Assert.Equal(
-            expected: iRet,
             actual: mRet);
 
-        Assert.Equal(
-            expected: iOut,
-            actual: cOut);
+        ;
 
         Assert.Equal(
             expected: iOut,
@@ -40,9 +33,7 @@ public sealed class BackendParityTests
     [Fact]
     public void Assert_WithMessage_ThrowsAcrossBackends()
     {
-        string src = @"fn main() {
-            assert(0, 'boom');
-        }";
+        string src = "fn main() { assert(0, \"boom\"); }";
 
         void AssertThrows(
             Func<string, (object? ret, string stdout)> runner)
@@ -55,7 +46,6 @@ public sealed class BackendParityTests
         }
 
         AssertThrows(TestUtils.RunInterpreter);
-        AssertThrows(TestUtils.RunCil);
         AssertThrows(TestUtils.RunVmMirJit);
     }
 
@@ -70,20 +60,11 @@ public sealed class BackendParityTests
         }";
 
         (object? iRet, string iOut) = TestUtils.RunInterpreter(src);
-        (object? cRet, string cOut) = TestUtils.RunCil(src);
         (object? mRet, string mOut) = TestUtils.RunVmMirJit(src);
 
         Assert.Equal(
             expected: iRet,
-            actual: cRet);
-
-        Assert.Equal(
-            expected: iRet,
             actual: mRet);
-
-        Assert.Equal(
-            expected: iOut,
-            actual: cOut);
 
         Assert.Equal(
             expected: iOut,

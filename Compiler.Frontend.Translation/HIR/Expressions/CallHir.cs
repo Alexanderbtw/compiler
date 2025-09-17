@@ -3,6 +3,9 @@ using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR.Expressions;
 
+/// <summary>
+///     Function call by name.
+/// </summary>
 public sealed record CallHir(
     ExprHir Callee,
     IReadOnlyList<ExprHir> Args,

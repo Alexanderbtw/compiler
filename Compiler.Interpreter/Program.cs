@@ -8,6 +8,11 @@ using Compiler.Frontend.Translation.HIR.Common;
 namespace Compiler.Interpreter;
 
 [ExcludeFromCodeCoverage]
+
+/// <summary>
+/// Minimal CLI runner for the HIR interpreter.
+/// Reads source, builds HIR, and executes it directly.
+/// </summary>
 public class Program
 {
     public static void Main(

@@ -18,7 +18,7 @@ public class Program
         string[] args)
     {
         CliArgs cli = CliArgs.Parse(args);
-        (GcOptions gcOptions, bool printStats) = GcCli.ParseFromArgs(args);
+        (GcOptions gcOptions, bool printStats) = GcCliArgs.Parse(args);
         bool quiet = cli.Quiet;
         bool measure = cli.Time;
 
@@ -53,9 +53,9 @@ public class Program
 
         var sw = Stopwatch.StartNew();
         Value ret = jit.Execute(
-            vm: vm,
-            module: mir,
-            entry: "main");
+            virtualMachine: vm,
+            mirModule: mir,
+            entryFunctionName: "main");
 
         sw.Stop();
 

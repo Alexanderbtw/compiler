@@ -28,9 +28,9 @@ public sealed class GcModesStatsTests(
         var vm = new VirtualMachine(options: opts);
         var jit = new MirJitCil();
         jit.Execute(
-            vm: vm,
-            module: TestUtils.BuildMir(AllocLoopSrc),
-            entry: "main");
+            virtualMachine: vm,
+            mirModule: TestUtils.BuildMir(AllocLoopSrc),
+            entryFunctionName: "main");
 
         GcStats s = vm.GetGcStats();
         output.WriteLine(

@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Compiler.Backend.JIT.Abstractions\Compiler.Backend.JIT.Abstractions.csproj" />
     <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
     <ProjectReference Include="..\Compiler.Backend.VM\Compiler.Backend.VM.csproj"/>
   </ItemGroup>

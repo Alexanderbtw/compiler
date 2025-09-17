@@ -4,12 +4,17 @@ using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
 using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
 using Compiler.Frontend.Translation.HIR.Semantic.Symbols;
+using Compiler.Frontend.Translation.HIR.Semantic.Symbols.Abstractions;
 using Compiler.Frontend.Translation.HIR.Statements;
 using Compiler.Frontend.Translation.HIR.Statements.Abstractions;
 using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR.Semantic;
 
+/// <summary>
+///     Light semantic checks over HIR.
+///     Verifies existence of referenced functions, sane builtin arities, and basic control-flow rules.
+/// </summary>
 public sealed class SemanticChecker
 {
     private FuncHir? _currentFunc;
@@ -38,9 +43,10 @@ public sealed class SemanticChecker
             _currentFunc = f;
             PushScope();
 
+            // Try to add parameters
             foreach (string p in f.Parameters)
             {
-                AddValue(
+                TryAddValue(
                     name: p,
                     s: new ParamSymbol(p),
                     dupMsg: $"parameter '{p}' already defined in '{f.Name}'");
@@ -59,7 +65,7 @@ public sealed class SemanticChecker
         }
     }
 
-    private bool AddValue(
+    private bool TryAddValue(
         string name,
         Symbol s,
         string dupMsg)
@@ -169,9 +175,7 @@ public sealed class SemanticChecker
 
     private void PopulateGlobalWithBuiltins()
     {
-        // Register builtin function names in the function namespace to prevent user re-declaration.
-        // We don't rely on parameter counts here because arity for builtins is checked separately
-        // via descriptors (supports overloads and varargs).
+        // Register builtin function names
         foreach (KeyValuePair<string, List<BuiltinDescriptor>> kv in Builtins.Table)
         {
             _funcs[kv.Key] = new FuncSymbol(
@@ -320,7 +324,7 @@ public sealed class SemanticChecker
     private void VisitLet(
         LetHir vd)
     {
-        if (AddValue(
+        if (TryAddValue(
                 name: vd.Name,
                 s: new VarSymbol(vd.Name),
                 dupMsg: $"variable '{vd.Name}' already defined"))

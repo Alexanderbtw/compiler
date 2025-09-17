@@ -140,7 +140,7 @@ public sealed class GcHeap(
             PeakLive = _allocatedArrays.Count;
         }
 
-        // Heuristic: if still near the threshold after collection, grow it to amortize cost
+        // if still near the threshold after collection, grow it to amortize cost
         if (_allocatedArrays.Count >= CollectionThreshold)
         {
             int grown = (int)Math.Ceiling(CollectionThreshold * _growthFactor);
@@ -159,15 +159,6 @@ public sealed class GcHeap(
             live: _allocatedArrays.Count,
             threshold: CollectionThreshold,
             growthFactor: _growthFactor);
-    }
-
-    /// <summary>Configure the collection threshold (minimum 16).</summary>
-    public void SetThreshold(
-        int threshold)
-    {
-        CollectionThreshold = Math.Max(
-            val1: 16,
-            val2: threshold);
     }
 
     /// <summary>Returns true if the heap suggests doing a collection after an allocation.</summary>

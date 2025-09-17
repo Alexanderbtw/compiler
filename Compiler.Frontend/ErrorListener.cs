@@ -2,7 +2,7 @@
 
 namespace Compiler.Frontend;
 
-public class ErrorListener<TSymbol> : ConsoleErrorListener<TSymbol>
+public sealed class ErrorListener<TSymbol> : ConsoleErrorListener<TSymbol>
 {
     public bool HadError;
 

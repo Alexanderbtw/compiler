@@ -5,16 +5,18 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
+    <ProjectReference Include="..\Compiler.Backend.JIT.Abstractions\Compiler.Backend.JIT.Abstractions.csproj" />
     <ProjectReference Include="..\Compiler.Backend.VM\Compiler.Backend.VM.csproj"/>
+    <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
   </ItemGroup>
 
-  <PropertyGroup>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="LLVMSharp" Version="20.1.2"/>
+  </ItemGroup>
 
   <ItemGroup>
     <None Update="main.minl">
@@ -22,4 +24,9 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Compiler.Tests"/>
+  </ItemGroup>
+
 </Project>
+

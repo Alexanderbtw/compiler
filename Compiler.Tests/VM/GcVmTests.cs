@@ -20,9 +20,9 @@ public sealed class GcVmTests
         var vm = new VirtualMachine(options: opts);
         var jit = new MirJitCil();
         jit.Execute(
-            vm: vm,
-            module: TestUtils.BuildMir(AllocLoopSrc),
-            entry: "main");
+            virtualMachine: vm,
+            mirModule: TestUtils.BuildMir(AllocLoopSrc),
+            entryFunctionName: "main");
 
         GcStats s = vm.GetGcStats();
         Assert.True(s.TotalAllocations >= 64);
@@ -44,9 +44,9 @@ public sealed class GcVmTests
         var vm = new VirtualMachine(options: opts);
         var jit = new MirJitCil();
         jit.Execute(
-            vm: vm,
-            module: TestUtils.BuildMir(AllocLoopSrc),
-            entry: "main");
+            virtualMachine: vm,
+            mirModule: TestUtils.BuildMir(AllocLoopSrc),
+            entryFunctionName: "main");
 
         GcStats s = vm.GetGcStats();
         Assert.True(s.TotalAllocations >= 64);

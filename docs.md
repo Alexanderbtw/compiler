@@ -19,7 +19,7 @@ backends (CLR and a custom VM), plus a tree‑walking interpreter. Program files
 
 - Interpreter: `dotnet run --project Compiler.Interpreter [options] [file]`
 - CIL JIT (VM semantics): `dotnet run --project Compiler.Backend.JIT.CIL [options] [file]`
-- Native JIT (experimental): `dotnet run --project Compiler.Backend.JIT.Native [options] [file]`
+- LLVM JIT (experimental): `dotnet run --project Compiler.Backend.JIT.LLVM [options] [file]`
 
 ### Common options
 
@@ -40,6 +40,19 @@ backends (CLR and a custom VM), plus a tree‑walking interpreter. Program files
 - CIL JIT compiles MIR → IL and executes via CLR JIT. It implements VM semantics (Value/VmArray/Builtins) and integrates
   with the VM GC.
 - Native JIT compiles MIR → x64 machine code (in progress), sharing the same VM runtime contracts.
+
+LLVM JIT options
+
+- `--dump-ir` (alias `-S`) prints the generated LLVM IR before JIT execution.
+
+LLVM JIT prerequisites
+
+- Install system LLVM so `libLLVM` can be loaded by LLVMSharp.
+    - macOS (Homebrew): `brew install llvm`
+        - Preloaded from `$(HOMEBREW_PREFIX)/opt/llvm/lib/libLLVM.dylib` when available.
+        - Optional override: set `LIBLLVM_PATH=/path/to/libLLVM.dylib`.
+    - Linux: install distro `llvm` dev package (provides `libLLVM.so`).
+    - Windows: ensure `libLLVM.dll`/`LLVM-C.dll` is on `PATH`.
 
 Example GC stats output
 

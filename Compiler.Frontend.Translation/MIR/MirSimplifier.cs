@@ -2,13 +2,13 @@ using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Frontend.Translation.MIR.Operands;
+using Compiler.Frontend.Translation.MIR.Operands.Abstractions;
 
 namespace Compiler.Frontend.Translation.MIR;
 
 /// <summary>
-///     MIR simplification pass: constant folding, copy-propagation inside basic blocks,
-///     and simple branch folding (BrCond with const bool).
-///     Conservative by design (no reordering, no DCE beyond removing no-op moves).
+///     constant folding, copy-propagation inside basic blocks, simple branch folding (BrCond with const bool)
+///     conservative by design (no reordering, no DCE beyond removing no-op moves).
 /// </summary>
 public sealed class MirSimplifier
 {
@@ -41,8 +41,6 @@ public sealed class MirSimplifier
         return leftType == typeof(long) || leftType == typeof(bool) || leftType == typeof(char) || leftType == typeof(string);
     }
 
-    // For terminators we only consider direct VReg -> Const mapping (no deep chains),
-    // because side effects across blocks are not tracked here.
     private static MOperand ResolveFromRegisterOnly(
         MOperand op,
         Dictionary<int, MOperand> environment)
@@ -258,7 +256,7 @@ public sealed class MirSimplifier
             basicBlock.Instructions.Clear();
             basicBlock.Instructions.AddRange(rewrittenInstructions);
 
-            // Terminator simplification: BrCond with constant bool
+            // Terminator simplification, BrCond with constant bool
             if (basicBlock.Terminator is BrCond brCond)
             {
                 MOperand condition = ResolveFromRegisterOnly(

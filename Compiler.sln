@@ -9,6 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "common", "common", "{C3A8B2
 		AGENTS.md = AGENTS.md
 		docs.md = docs.md
 		README.md = README.md
+		test.runsettings.xml = test.runsettings.xml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compiler.Tests", "Compiler.Tests\Compiler.Tests.csproj", "{17C4D463-AF25-4B9C-8E91-96E0886E447E}"
@@ -21,9 +22,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compiler.Interpreter", "Com
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compiler.Backend.VM", "Compiler.Backend.VM\Compiler.Backend.VM.csproj", "{F7EC8D3D-4AAF-46DB-BA9B-0F0E8B20282A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compiler.Backend.JIT.Native", "Compiler.Backend.JIT.Native\Compiler.Backend.JIT.Native.csproj", "{B7F9A7E2-8E40-4A08-9AE8-9B5F9F0D9F0A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compiler.Backend.JIT.LLVM", "Compiler.Backend.JIT.LLVM\Compiler.Backend.JIT.LLVM.csproj", "{B7F9A7E2-8E40-4A08-9AE8-9B5F9F0D9F0A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compiler.Backend.JIT.CIL", "Compiler.Backend.JIT.CIL\Compiler.Backend.JIT.CIL.csproj", "{56E0EAAE-9C90-4A6A-9D50-07E3C2C9A1B1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compiler.Backend.JIT.Abstractions", "Compiler.Backend.JIT.Abstractions\Compiler.Backend.JIT.Abstractions.csproj", "{ED9B56AD-9047-4D9B-9BE7-E01D1E0AA917}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -59,6 +62,10 @@ Global
 		{56E0EAAE-9C90-4A6A-9D50-07E3C2C9A1B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{56E0EAAE-9C90-4A6A-9D50-07E3C2C9A1B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{56E0EAAE-9C90-4A6A-9D50-07E3C2C9A1B1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED9B56AD-9047-4D9B-9BE7-E01D1E0AA917}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED9B56AD-9047-4D9B-9BE7-E01D1E0AA917}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED9B56AD-9047-4D9B-9BE7-E01D1E0AA917}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED9B56AD-9047-4D9B-9BE7-E01D1E0AA917}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{17C4D463-AF25-4B9C-8E91-96E0886E447E} = {24C647CC-F034-45E5-B087-34D041758D80}

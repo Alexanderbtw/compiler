@@ -4,6 +4,9 @@ using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR.Expressions;
 
+/// <summary>
+///     Variable declaration with optional initializer.
+/// </summary>
 public sealed record LetHir(
     string Name,
     ExprHir? Init,

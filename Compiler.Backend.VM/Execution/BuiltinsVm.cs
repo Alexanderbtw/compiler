@@ -1,9 +1,14 @@
-using System.Text;
+using System.Diagnostics;
 
 using Compiler.Backend.VM.Values;
+using Compiler.Frontend.Translation.HIR.Metadata;
+using Compiler.Frontend.Translation.HIR.Metadata;
 
 namespace Compiler.Backend.VM.Execution;
 
+/// <summary>
+///     VM builtins used by both JITs.
+/// </summary>
 public static class BuiltinsVm
 {
     public static Value Invoke(
@@ -11,25 +16,36 @@ public static class BuiltinsVm
         VmJitContext ctx,
         Value[] args)
     {
-        switch (name)
+        // Validate against the frontend builtin catalog to keep names/arity in sync
+        IReadOnlyList<BuiltinDescriptor> cands = Builtins.GetCandidates(name);
+
+        if (cands.Count == 0)
         {
-            case "print":
-                return Print(args);
-            case "assert":
-                return Assert(args);
-            case "chr":
-                return Chr(args);
-            case "ord":
-                return Ord(args);
-            case "len":
-                return Len(args);
-            case "array":
-                return Array(
-                    ctx: ctx,
-                    args: args);
-            default:
-                throw new InvalidOperationException($"unknown builtin '{name}'");
+            throw new InvalidOperationException($"unknown builtin '{name}'");
         }
+
+        bool arityOk = cands.Any(d =>
+            (d.Attributes.HasFlag(BuiltinAttr.VarArgs) && args.Length >= d.MinArity) ||
+            (!d.Attributes.HasFlag(BuiltinAttr.VarArgs) && args.Length >= d.MinArity && args.Length <= (d.MaxArity ?? d.MinArity)));
+
+        if (!arityOk)
+        {
+            throw new InvalidOperationException($"builtin '{name}' arity mismatch: got {args.Length}");
+        }
+
+        return name switch
+        {
+            "print" => Print(args),
+            "assert" => Assert(args),
+            "chr" => Chr(args),
+            "ord" => Ord(args),
+            "len" => Len(args),
+            "array" => Array(
+                ctx: ctx,
+                args: args),
+            "clock_ms" => ClockMs(),
+            _ => throw new InvalidOperationException($"unknown builtin '{name}'")
+        };
     }
 
     private static Value Array(
@@ -43,6 +59,11 @@ public static class BuiltinsVm
 
         int n = (int)args[0]
             .AsInt64();
+
+        if (n < 0)
+        {
+            throw new InvalidOperationException("array length must be non-negative");
+        }
 
         VmArray arr = ctx.AllocArray(n);
 
@@ -89,9 +110,23 @@ public static class BuiltinsVm
             throw new InvalidOperationException("chr(x) expects 1 arg");
         }
 
-        return Value.FromChar(
-            (char)args[0]
-                .AsInt64());
+        long code = args[0]
+            .AsInt64();
+
+        if (code < char.MinValue || code > char.MaxValue)
+        {
+            // Match interpreter range check
+            throw new InvalidOperationException("chr(...) code point out of range");
+        }
+
+        return Value.FromChar((char)code);
+    }
+
+    private static Value ClockMs()
+    {
+        long ms = (long)(Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency);
+
+        return Value.FromLong(ms);
     }
     private static Value Len(
         ReadOnlySpan<Value> args)
@@ -112,33 +147,37 @@ public static class BuiltinsVm
             throw new InvalidOperationException("ord(c) expects 1 arg");
         }
 
-        return args[0].Tag == ValueTag.Char
-            ? Value.FromLong(
+        // Match interpreter: accepts char or 1-length string
+        if (args[0].Tag == ValueTag.Char)
+        {
+            return Value.FromLong(
                 args[0]
-                    .AsChar())
-            : Value.FromLong(
-                args[0]
-                    .AsString()[0]);
+                    .AsChar());
+        }
+
+        if (args[0].Tag == ValueTag.String)
+        {
+            string s = args[0]
+                .AsString();
+
+            if (s.Length != 1)
+            {
+                throw new InvalidOperationException("ord(...) expects char or 1-length string");
+            }
+
+            return Value.FromLong(s[0]);
+        }
+
+        throw new InvalidOperationException("ord(...) expects char or 1-length string");
     }
 
     private static Value Print(
         ReadOnlySpan<Value> args)
     {
-        var sb = new StringBuilder();
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            if (i > 0)
-            {
-                sb.Append(' ');
-            }
-
-            sb.Append(
-                args[i]
-                    .ToString());
-        }
-
-        Console.WriteLine(sb.ToString());
+        BuiltinsCore.PrintLine(
+            tokens: args
+                .ToArray()
+                .Select(v => v.ToString()));
 
         return Value.Null;
     }

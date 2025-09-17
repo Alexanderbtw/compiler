@@ -2,15 +2,12 @@ using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Frontend.Translation.MIR.Operands;
+using Compiler.Frontend.Translation.MIR.Operands.Abstractions;
 
 namespace Compiler.Frontend.Translation.MIR;
 
 /// <summary>
-///     Minimal type inference pass for MIR to help IL generation:
-///     - arithmetic on i64,
-///     - boolean results for comparisons and logical NOT,
-///     - char for char-constants,
-///     - everything else defaults to Obj.
+///     Minimal type inference pass for MIR to help IL generation TODO: Not ready yet
 /// </summary>
 public sealed class MirTypeAnnotator
 {
@@ -23,7 +20,7 @@ public sealed class MirTypeAnnotator
         }
     }
 
-    private void Annotate(
+    private static void Annotate(
         MirFunction function)
     {
         // Function parameters: default to Obj (can be refined later)

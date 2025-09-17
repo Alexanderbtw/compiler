@@ -2,6 +2,9 @@ using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 
 namespace Compiler.Frontend.Translation.MIR.Instructions;
 
+/// <summary>
+///     A basic block: a straight-line list of instructions ending with an optional terminator.
+/// </summary>
 public sealed class MirBlock(
     string name)
 {

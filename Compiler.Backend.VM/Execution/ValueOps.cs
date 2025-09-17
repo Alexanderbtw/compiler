@@ -3,7 +3,7 @@ using Compiler.Backend.VM.Values;
 namespace Compiler.Backend.VM.Execution;
 
 /// <summary>
-///     Pure value operations used by JITs and builtins. No VM dependency.
+///     Pure value helpers shared by both JITs and builtins. No VM dependency.
 /// </summary>
 public static class ValueOps
 {
@@ -21,6 +21,7 @@ public static class ValueOps
             };
         }
 
+        // Same tag → compare by the natural notion for that tag
         return a.Tag switch
         {
             ValueTag.Null => true,
@@ -67,7 +68,7 @@ public static class ValueOps
             ValueTag.Array => Value.FromLong(
                 v.AsArray()
                     .Length),
-            _ => throw new InvalidOperationException("len: unsupported type")
+            _ => throw new InvalidOperationException("len(...) expects string or array")
         };
     }
 

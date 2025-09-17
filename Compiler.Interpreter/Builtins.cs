@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 using Compiler.Frontend.Translation.HIR.Metadata;
@@ -9,6 +10,10 @@ using CommonBuiltins = Compiler.Frontend.Translation.HIR.Metadata.Builtins;
 
 namespace Compiler.Interpreter;
 
+/// <summary>
+///     Builtins for the tree-walking interpreter.
+///     Mirrors the frontend table and implements a few intrinsics inline for speed.
+/// </summary>
 public static class Builtins
 {
     public static bool TryInvoke(
@@ -141,6 +146,7 @@ public static class Builtins
         {
             bool b => b,
             long n => n != 0,
+            char ch => ch != '\0',
             string s => s.Length != 0,
             Array arr => arr.Length != 0,
             null => false,
@@ -172,11 +178,14 @@ public static class Builtins
         switch (name)
         {
             case "print":
-                // print(x, y, z ...) → writes a space-separated line to stdout
-                Console.WriteLine(
-                    string.Join(
-                        separator: " ",
-                        values: args.Select(a => a?.ToString() ?? "null")));
+                BuiltinsCore.PrintLine(
+                    tokens: args.Select(a => a is Array
+                        ? "[array]"
+                        : a?.ToString() ?? "null"));
+
+                return true;
+            case "clock_ms":
+                result = (long)(Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency);
 
                 return true;
 

@@ -2,9 +2,14 @@ using System.Globalization;
 
 namespace Compiler.Backend.VM.Options;
 
-public static class GcCli
+/// <summary>
+///     GC-related CLI options.
+/// </summary>
+public readonly record struct GcCliArgs(
+    GcOptions Options,
+    bool PrintStats)
 {
-    public static (GcOptions Options, bool PrintStats) ParseFromArgs(
+    public static GcCliArgs Parse(
         string[] args)
     {
         bool auto = true;
@@ -45,7 +50,7 @@ public static class GcCli
                 }
             }
             else if (arg.StartsWith(
-                         value: "--vm-gc-auto=",
+                         value: "--vm-gc-auto",
                          comparisonType: StringComparison.OrdinalIgnoreCase))
             {
                 string raw = arg["--vm-gc-auto=".Length..]
@@ -62,6 +67,8 @@ public static class GcCli
             GrowthFactor = growth
         };
 
-        return (options, stats);
+        return new GcCliArgs(
+            Options: options,
+            PrintStats: stats);
     }
 }

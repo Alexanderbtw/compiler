@@ -2,6 +2,10 @@ using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
 
 namespace Compiler.Frontend.Translation.HIR.Stringify;
 
+/// <summary>
+///     Utilities to pretty-print HIR nodes and tokens.
+///     Internal on purpose; used by logs and debugging helpers.
+/// </summary>
 internal static class HirPretty
 {
     public static string Join<T>(

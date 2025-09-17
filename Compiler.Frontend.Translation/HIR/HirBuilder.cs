@@ -10,6 +10,10 @@ using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR;
 
+/// <summary>
+///     Builds a simple HIR from the ANTLR parse tree.
+///     Left-associative folding and explicit short-circuit lowering for && and ||.
+/// </summary>
 public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
 {
     private static readonly Dictionary<string, BinOp> BinMap = new Dictionary<string, BinOp>
@@ -30,14 +34,14 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
     public ProgramHir Build(
         MiniLangParser.ProgramContext ctx)
     {
-        return (ProgramHir)VisitProgram(ctx);
+        return VisitProgram(ctx);
     }
 
     public override object VisitAddition(
         MiniLangParser.AdditionContext ctx)
     {
         return ctx.children.Count == 1
-            ? Visit(ctx.multiplication(0))
+            ? (ExprHir)Visit(ctx.multiplication(0))
             : BuildLeftAssoc(
                 terms: ctx.multiplication(),
                 ops: ExtractOps(
@@ -46,7 +50,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
                     "-"));
     }
 
-    public override object VisitAssign(
+    public override BinHir VisitAssign(
         MiniLangParser.AssignContext ctx)
     {
         return new BinHir(
@@ -56,7 +60,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitBlock(
+    public override BlockHir VisitBlock(
         MiniLangParser.BlockContext ctx)
     {
         List<StmtHir> stmts = ctx
@@ -69,7 +73,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitBoolFalse(
+    public override BoolHir VisitBoolFalse(
         MiniLangParser.BoolFalseContext ctx)
     {
         return new BoolHir(
@@ -77,7 +81,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitBoolTrue(
+    public override BoolHir VisitBoolTrue(
         MiniLangParser.BoolTrueContext ctx)
     {
         return new BoolHir(
@@ -85,7 +89,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitCharLiteral(
+    public override CharHir VisitCharLiteral(
         MiniLangParser.CharLiteralContext ctx)
     {
         return new CharHir(
@@ -96,11 +100,11 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitComparison(
+    public override ExprHir VisitComparison(
         MiniLangParser.ComparisonContext ctx)
     {
         return ctx.children.Count == 1
-            ? Visit(ctx.addition(0))
+            ? (ExprHir)Visit(ctx.addition(0))
             : BuildLeftAssoc(
                 terms: ctx.addition(),
                 ops: ExtractOps(
@@ -111,11 +115,11 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
                     ">="));
     }
 
-    public override object VisitEquality(
+    public override ExprHir VisitEquality(
         MiniLangParser.EqualityContext ctx)
     {
         return ctx.children.Count == 1
-            ? Visit(ctx.comparison(0))
+            ? (ExprHir)Visit(ctx.comparison(0))
             : BuildLeftAssoc(
                 terms: ctx.comparison(),
                 ops: ExtractOps(
@@ -124,7 +128,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
                     "!="));
     }
 
-    public override object VisitExprStmt(
+    public override ExprStmtHir VisitExprStmt(
         MiniLangParser.ExprStmtContext ctx)
     {
         return new ExprStmtHir(
@@ -135,7 +139,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
     }
 
     // for(init; cond; iter) stmt  =>  { init; while(cond ?? true) { stmt; iter...; } }
-    public override object VisitForStmt(
+    public override BlockHir VisitForStmt(
         MiniLangParser.ForStmtContext ctx)
     {
         {
@@ -205,7 +209,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
         }
     }
 
-    public override object VisitFunctionDecl(
+    public override FuncHir VisitFunctionDecl(
         MiniLangParser.FunctionDeclContext ctx)
     {
         string? name = ctx
@@ -229,7 +233,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitIdentifier(
+    public override VarHir VisitIdentifier(
         MiniLangParser.IdentifierContext ctx)
     {
         return new VarHir(
@@ -239,7 +243,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitIfStmt(
+    public override IfHir VisitIfStmt(
         MiniLangParser.IfStmtContext ctx)
     {
         return new IfHir(
@@ -251,7 +255,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitIntLiteral(
+    public override IntHir VisitIntLiteral(
         MiniLangParser.IntLiteralContext ctx)
     {
         return new IntHir(
@@ -262,33 +266,33 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitLogicalAnd(
+    public override ExprHir VisitLogicalAnd(
         MiniLangParser.LogicalAndContext ctx)
     {
         return ctx.AND_AND()
             .Length == 0
-            ? Visit(ctx.equality(0))
+            ? (ExprHir)Visit(ctx.equality(0))
             : BuildLeftAssoc(
                 terms: ctx.equality(),
                 ops: ctx.AND_AND());
     }
 
-    public override object VisitLogicalOr(
+    public override ExprHir VisitLogicalOr(
         MiniLangParser.LogicalOrContext ctx)
     {
         return ctx.OR_OR()
             .Length == 0
-            ? Visit(ctx.logicalAnd(0))
+            ? (ExprHir)Visit(ctx.logicalAnd(0))
             : BuildLeftAssoc(
                 terms: ctx.logicalAnd(),
                 ops: ctx.OR_OR());
     }
 
-    public override object VisitMultiplication(
+    public override ExprHir VisitMultiplication(
         MiniLangParser.MultiplicationContext ctx)
     {
         return ctx.children.Count == 1
-            ? Visit(ctx.unary(0))
+            ? (ExprHir)Visit(ctx.unary(0))
             : BuildLeftAssoc(
                 terms: ctx.unary(),
                 ops: ExtractOps(
@@ -298,13 +302,13 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
                     "%"));
     }
 
-    public override object VisitParens(
+    public override ExprHir VisitParens(
         MiniLangParser.ParensContext ctx)
     {
-        return Visit(ctx.expression());
+        return (ExprHir)Visit(ctx.expression());
     }
 
-    public override object VisitPostfixExpr(
+    public override ExprHir VisitPostfixExpr(
         MiniLangParser.PostfixExprContext ctx)
     {
         var expr = (ExprHir)Visit(ctx.primary());
@@ -342,7 +346,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
         return expr;
     }
 
-    public override object VisitProgram(
+    public override ProgramHir VisitProgram(
         MiniLangParser.ProgramContext ctx)
     {
         List<FuncHir> funcs = ctx
@@ -353,7 +357,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
         return new ProgramHir(funcs);
     }
 
-    public override object VisitReturnStmt(
+    public override ReturnHir VisitReturnStmt(
         MiniLangParser.ReturnStmtContext ctx)
     {
         return new ReturnHir(
@@ -414,7 +418,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
         throw new ArgumentException("Unknown statement variant");
     }
 
-    public override object VisitStringLiteral(
+    public override StringHir VisitStringLiteral(
         MiniLangParser.StringLiteralContext ctx)
     {
         return new StringHir(
@@ -438,7 +442,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
                 Span: Span(ctx));
     }
 
-    public override object VisitVariableDecl(
+    public override LetHir VisitVariableDecl(
         MiniLangParser.VariableDeclContext ctx)
     {
         string? id = ctx
@@ -455,7 +459,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Span: Span(ctx));
     }
 
-    public override object VisitWhileStmt(
+    public override WhileHir VisitWhileStmt(
         MiniLangParser.WhileStmtContext ctx)
     {
         return new WhileHir(

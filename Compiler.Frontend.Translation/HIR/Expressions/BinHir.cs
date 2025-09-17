@@ -3,6 +3,9 @@ using Compiler.Frontend.Translation.HIR.Stringify;
 
 namespace Compiler.Frontend.Translation.HIR.Expressions;
 
+/// <summary>
+///     Binary expression.
+/// </summary>
 public sealed record BinHir(
     BinOp Op,
     ExprHir Left,
