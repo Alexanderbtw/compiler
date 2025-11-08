@@ -691,7 +691,6 @@ internal sealed class CilEmitter
                 }
             }
 
-            // Terminator
             switch (b.Terminator)
             {
                 case null:

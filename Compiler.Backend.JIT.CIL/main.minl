@@ -1,39 +1,33 @@
-fn fact(n) {
-    if (n <= 1) return 1;
-    return n * fact(n - 1);
-}
+fn sieve(limit) {
+    var flags = array(limit + 1, 1);
 
-fn fib(n) {
-    if (n <= 1) return n;
-    return fib(n - 1) + fib(n - 2);
-}
-
-fn sum_while(n) {
-    var i = 0;
-    var acc = 0;
-    while (i < n) {
-        acc = acc + i;
-        i = i + 1;
+    flags[0] = 0;
+    flags[1] = 0;
+    var p = 2;
+    while (p * p <= limit) {
+        if (flags[p] == 1) {
+            var j = p * p;
+            for (var j = p * p; j <= limit; j = j + p) {
+                flags[j] = 0;
+            }
+        }
+        p = p + 1;
     }
-    return acc;
-}
-
-fn sum_for(n) {
-    var acc = 0;
-    for (var i = 0; i < n; i = i + 1) {
-        acc = acc + i;
-    }
-    return acc;
+    return flags;
 }
 
 fn main() {
-    var arr1 = array(3);
-    arr1[0] = 1; arr1[1] = 2; arr1[2] = 3;
-    var len1 = len(arr1);
-    print("len:", len1);
-    for (var i = 0; i < len1; i = i + 1) {
-       print(arr1[i]);
-    }
+    var limit = 100000;
+    var primeFlags = sieve(limit);
 
-    print(sum_for(5));
+    // count primes instead of printing them all
+    var count = 0;
+    var i = 0;
+    while (i <= limit) {
+        if (primeFlags[i] == 1) count = count + 1;
+        i = i + 1;
+    }
+    print(count);
 }
+
+// RET: 9592

@@ -16,7 +16,6 @@ public static class BuiltinsVm
         VmJitContext ctx,
         Value[] args)
     {
-        // Validate against the frontend builtin catalog to keep names/arity in sync
         IReadOnlyList<BuiltinDescriptor> cands = Builtins.GetCandidates(name);
 
         if (cands.Count == 0)
