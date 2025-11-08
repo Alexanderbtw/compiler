@@ -41,6 +41,8 @@ public class Program
 
         MirModule mir = FrontendPipeline.BuildMir(hir);
 
+        Console.WriteLine(mir.ToString());
+
         var vm = new VirtualMachine(options: gcOptions);
         var jit = new MirJitCil();
 

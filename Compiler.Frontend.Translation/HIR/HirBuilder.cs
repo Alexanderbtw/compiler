@@ -37,7 +37,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
         return VisitProgram(ctx);
     }
 
-    public override object VisitAddition(
+    public override ExprHir VisitAddition(
         MiniLangParser.AdditionContext ctx)
     {
         return ctx.children.Count == 1
@@ -475,7 +475,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
     {
         var e = (ExprHir)Visit(terms[0]);
 
-        for (int i = 0; i < ops.Count; i++)
+        for (var i = 0; i < ops.Count; i++)
         {
             BinOp op = BinMap[ops[i]
                 .GetText()];

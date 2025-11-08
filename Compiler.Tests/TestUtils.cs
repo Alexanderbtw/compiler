@@ -4,7 +4,6 @@ using System.Text;
 using Antlr4.Runtime;
 
 using Compiler.Backend.JIT.CIL;
-using Compiler.Backend.JIT.LLVM;
 using Compiler.Backend.VM;
 using Compiler.Backend.VM.Values;
 using Compiler.Frontend;
@@ -20,8 +19,6 @@ using Compiler.Frontend.Translation.MIR;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
-
-using LLVMSharp.Interop;
 
 using Xunit.Abstractions;
 using Xunit.Sdk;
@@ -225,34 +222,6 @@ internal static class TestUtils
             object? ret = interp.Run();
 
             return (ret, sb
-                .ToString()
-                .TrimEnd());
-        }
-        finally { Console.SetOut(old); }
-    }
-
-    public static (object? ret, string stdout) RunLlvmJit(
-        string src)
-    {
-        MirModule mir = BuildMir(src);
-        var vm = new VirtualMachine();
-
-        var sb = new StringBuilder();
-        TextWriter old = Console.Out;
-        Console.SetOut(new StringWriter(sb));
-
-        try
-        {
-            var emitter = new LlvmEmitter();
-            LLVMModuleRef module = emitter.EmitModule(mir);
-
-            var jit = new MirJitLlvm();
-            Value v = jit.ExecuteModule(
-                virtualMachine: vm,
-                module: module,
-                entryFunctionName: "main");
-
-            return (TryUnwrapVmValue(v), sb
                 .ToString()
                 .TrimEnd());
         }
