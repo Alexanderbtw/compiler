@@ -1,4 +1,4 @@
-// uses Value, ValueTag, VmArray, VmString
+// uses Value, ValueTag, VmHeapObject, VmArray, VmString
 
 using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Runtime.VM.Execution.Diagnostics;
@@ -16,8 +16,7 @@ public sealed class GcHeap(
     int initialThreshold = 1024,
     double growthFactor = 2.0)
 {
-    private readonly HashSet<VmArray> _allocatedArrays = [];
-    private readonly HashSet<VmString> _allocatedStrings = [];
+    private readonly HashSet<VmHeapObject> _allocatedObjects = [];
 
     // Simple trigger based on number of live objects. Tune or replace with a byte-based threshold if needed.
     private readonly double _growthFactor = Math.Max(
@@ -31,13 +30,13 @@ public sealed class GcHeap(
         val2: initialThreshold);
 
     /// <summary>Total number of arrays currently registered as live.</summary>
-    public int LiveArrayCount => _allocatedArrays.Count;
+    public int LiveArrayCount => _allocatedObjects.Count(static o => o is VmArray);
 
     /// <summary>Total number of managed objects currently registered as live.</summary>
-    public int LiveObjectCount => _allocatedArrays.Count + _allocatedStrings.Count;
+    public int LiveObjectCount => _allocatedObjects.Count;
 
     /// <summary>Total number of strings currently registered as live.</summary>
-    public int LiveStringCount => _allocatedStrings.Count;
+    public int LiveStringCount => _allocatedObjects.Count(static o => o is VmString);
 
     public int PeakLive { get; private set; }
 
@@ -55,7 +54,7 @@ public sealed class GcHeap(
         }
 
         var array = new VmArray(length);
-        _allocatedArrays.Add(array);
+        _allocatedObjects.Add(array);
         TotalAllocations++;
         VmRuntimeInstrumentation.ArrayAllocations.Add(1);
 
@@ -68,7 +67,7 @@ public sealed class GcHeap(
         string value)
     {
         var vmString = new VmString(value);
-        _allocatedStrings.Add(vmString);
+        _allocatedObjects.Add(vmString);
         TotalAllocations++;
         VmRuntimeInstrumentation.StringAllocations.Add(1);
         UpdatePeakLive();
@@ -93,89 +92,43 @@ public sealed class GcHeap(
         }
 
         // MARK
-        var markStack = new Stack<VmArray>();
+        var markStack = new Stack<VmHeapObject>();
 
         // Seed from roots
         foreach (Value root in roots)
         {
-            switch (root.Tag)
-            {
-                case ValueTag.Array:
-                    MarkArray(
-                        array: root.AsArray(),
-                        markStack: markStack);
-
-                    break;
-                case ValueTag.String:
-                    MarkString(root.AsString());
-
-                    break;
-            }
+            MarkValue(
+                value: root,
+                markStack: markStack);
         }
 
-        // Traverse array graph (handles nested arrays)
+        // Traverse object graph (currently arrays can contain references; strings cannot)
         while (markStack.Count > 0)
         {
-            VmArray array = markStack.Pop();
-            int length = array.Length;
-
-            for (var index = 0; index < length; index++)
-            {
-                Value element = array[index];
-
-                switch (element.Tag)
-                {
-                    case ValueTag.Array:
-                        MarkArray(
-                            array: element.AsArray(),
-                            markStack: markStack);
-
-                        break;
-                    case ValueTag.String:
-                        MarkString(element.AsString());
-
-                        break;
-                }
-            }
+            VmHeapObject current = markStack.Pop();
+            current.VisitReferences(value => MarkValue(
+                value: value,
+                markStack: markStack));
         }
 
         // SWEEP
-        var unreachable = new List<VmArray>();
-        var unreachableStrings = new List<VmString>();
+        var unreachable = new List<VmHeapObject>();
 
-        foreach (VmArray array in _allocatedArrays)
+        foreach (VmHeapObject heapObject in _allocatedObjects)
         {
-            if (!array.GcMarked)
+            if (!heapObject.GcMarked)
             {
-                unreachable.Add(array);
+                unreachable.Add(heapObject);
             }
             else
             {
-                array.GcMarked = false; // unmark survivor for next cycle
+                heapObject.GcMarked = false;
             }
         }
 
-        foreach (VmString vmString in _allocatedStrings)
+        foreach (VmHeapObject dead in unreachable)
         {
-            if (!vmString.GcMarked)
-            {
-                unreachableStrings.Add(vmString);
-            }
-            else
-            {
-                vmString.GcMarked = false;
-            }
-        }
-
-        // Remove unreachable arrays from the registry (CLR will reclaim them later)
-        foreach (VmArray dead in unreachable)
-        {
-            _allocatedArrays.Remove(dead);
-        }
-
-        foreach (VmString dead in unreachableStrings)
-        {
-            _allocatedStrings.Remove(dead);
+            _allocatedObjects.Remove(dead);
         }
 
         UpdatePeakLive();
@@ -207,23 +160,33 @@ public sealed class GcHeap(
         return LiveObjectCount >= CollectionThreshold;
     }
 
-    private void MarkArray(
-        VmArray array,
-        Stack<VmArray> markStack)
+    private void MarkHeapObject(
+        VmHeapObject heapObject,
+        Stack<VmHeapObject> markStack)
     {
-        if (_allocatedArrays.Contains(array) && !array.GcMarked)
+        if (_allocatedObjects.Contains(heapObject) && !heapObject.GcMarked)
         {
-            array.GcMarked = true;
-            markStack.Push(array);
+            heapObject.GcMarked = true;
+            markStack.Push(heapObject);
         }
     }
 
-    private void MarkString(
-        VmString vmString)
+    private void MarkValue(
+        Value value,
+        Stack<VmHeapObject> markStack)
     {
-        if (_allocatedStrings.Contains(vmString))
+        switch (value.Tag)
         {
-            vmString.GcMarked = true;
+            case ValueTag.Array:
+                MarkHeapObject(
+                    heapObject: value.AsArray(),
+                    markStack: markStack);
+                break;
+            case ValueTag.String:
+                MarkHeapObject(
+                    heapObject: value.AsString(),
+                    markStack: markStack);
+                break;
         }
     }
 

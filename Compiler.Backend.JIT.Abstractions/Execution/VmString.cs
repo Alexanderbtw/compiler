@@ -5,14 +5,17 @@ namespace Compiler.Backend.JIT.Abstractions.Execution;
 ///     The payload stays CLR-backed for now, while lifetime is managed by the runtime GC.
 /// </summary>
 public sealed class VmString(
-    string text)
+    string text) : VmHeapObject
 {
     public string Text { get; } = text ?? throw new ArgumentNullException(nameof(text));
-
-    internal bool GcMarked { get; set; }
 
     public override string ToString()
     {
         return Text;
+    }
+
+    internal override void VisitReferences(
+        Action<Value> visitor)
+    {
     }
 }
