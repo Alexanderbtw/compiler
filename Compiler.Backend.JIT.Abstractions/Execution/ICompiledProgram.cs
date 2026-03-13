@@ -1,4 +1,4 @@
-namespace Compiler.Execution;
+namespace Compiler.Backend.JIT.Abstractions.Execution;
 
 /// <summary>
 ///     Executable artifact produced by a backend compiler.

@@ -13,14 +13,14 @@ public sealed class InterpreterCommandFactory(
     public RootCommand Create()
     {
         var fileOption = new Option<FileInfo?>(
-            "--file",
+            name: "--file",
             "-f")
         {
             Description = "Path to the MiniLang source file."
         };
 
         var verboseOption = new Option<bool>(
-            "--verbose",
+            name: "--verbose",
             "-v")
         {
             Description = "Enable verbose compiler diagnostics."
@@ -45,7 +45,9 @@ public sealed class InterpreterCommandFactory(
         runCommand.Add(quietOption);
         runCommand.Add(timeOption);
 
-        runCommand.SetAction(async (parseResult, cancellationToken) =>
+        runCommand.SetAction(async (
+            parseResult,
+            cancellationToken) =>
         {
             FileInfo? file = parseResult.GetValue(fileOption);
 

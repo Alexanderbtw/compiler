@@ -3,8 +3,8 @@ using System.Text;
 
 using Antlr4.Runtime;
 
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Backend.JIT.CIL;
-using Compiler.Execution;
 using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR;
 using Compiler.Frontend.Translation.HIR.Common;
@@ -571,7 +571,8 @@ internal static class TestUtils
                 ValueTag.I64 => value.AsInt64(),
                 ValueTag.Bool => value.AsBool(),
                 ValueTag.Char => value.AsChar(),
-                ValueTag.String => value.AsString(),
+                ValueTag.String => value.AsString()
+                    .Text,
                 ValueTag.Array => VmArrayToHostArray(value.AsArray()),
                 ValueTag.Object => value.Ref,
                 _ => throw new ArgumentOutOfRangeException()

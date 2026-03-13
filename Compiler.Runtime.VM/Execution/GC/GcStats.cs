@@ -18,15 +18,15 @@ public readonly struct GcStats(
     /// <summary>Current growth factor used to raise the collection threshold after a collection.</summary>
     public double GrowthFactor { get; } = growthFactor;
 
-    /// <summary>Current number of arrays considered live after the last collection.</summary>
+    /// <summary>Current number of tracked managed objects considered live after the last collection.</summary>
     public int Live { get; } = live;
 
-    /// <summary>Maximum number of simultaneously live arrays observed so far.</summary>
+    /// <summary>Maximum number of simultaneously live managed objects observed so far.</summary>
     public int PeakLive { get; } = peakLive;
 
     /// <summary>Current collection threshold that triggers a collection.</summary>
     public int Threshold { get; } = threshold;
 
-    /// <summary>Total number of array allocations since the heap was created.</summary>
+    /// <summary>Total number of managed object allocations since the heap was created.</summary>
     public int TotalAllocations { get; } = totalAllocations;
 }

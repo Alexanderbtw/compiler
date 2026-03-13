@@ -70,4 +70,28 @@ public sealed class BackendParityTests
             expected: iOut,
             actual: mOut);
     }
+
+    [Fact]
+    public void StringBuiltins_ParityAcrossBackends()
+    {
+        var src = @"fn main() {
+            var s = ""hi"";
+            assert(len(s) == 2);
+            assert(ord(""Z"") == 90);
+            assert(s == ""hi"");
+            print(s);
+            return s;
+        }";
+
+        (object? iRet, string iOut) = TestUtils.RunInterpreter(src);
+        (object? mRet, string mOut) = TestUtils.RunVmMirJit(src);
+
+        Assert.Equal(
+            expected: iRet,
+            actual: mRet);
+
+        Assert.Equal(
+            expected: iOut,
+            actual: mOut);
+    }
 }

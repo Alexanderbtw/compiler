@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Reflection.Emit;
 
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
@@ -18,6 +18,7 @@ namespace Compiler.Backend.JIT.CIL;
 internal sealed class CilEmitter
 {
     private static readonly FieldInfo FiNull = typeof(Value).GetField(nameof(Value.Null))!;
+    private static readonly MethodInfo MiAllocateString = typeof(IExecutionRuntime).GetMethod(nameof(IExecutionRuntime.AllocateString))!;
     private static readonly MethodInfo MiArr = typeof(ValueOps).GetMethod(nameof(ValueOps.Arr))!;
 
     private static readonly MethodInfo MiBuiltins = typeof(BuiltinsVm)
@@ -831,9 +832,18 @@ internal sealed class CilEmitter
                 }
                 else if (c.Value is string s)
                 {
+                    il.Emit(OpCodes.Ldarg_0);
+                    il.Emit(
+                        opcode: OpCodes.Callvirt,
+                        meth: MiRuntime);
+
                     il.Emit(
                         opcode: OpCodes.Ldstr,
                         str: s);
+
+                    il.Emit(
+                        opcode: OpCodes.Callvirt,
+                        meth: MiAllocateString);
 
                     il.Emit(
                         opcode: OpCodes.Call,

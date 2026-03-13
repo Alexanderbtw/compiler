@@ -1,4 +1,4 @@
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Runtime.VM;
 using Compiler.Runtime.VM.Execution;
@@ -79,13 +79,15 @@ public sealed class BuiltinsConsistencyTests
         string name,
         int minArity)
     {
+        var vm = new VirtualMachine();
+
         return name switch
         {
             "print" => [Value.FromLong(0)],
             "assert" => [Value.FromBool(true)],
             "array" => [Value.FromLong(0)],
             "clock_ms" => [],
-            "len" => [Value.FromString("x")],
+            "len" => [Value.FromString(vm.AllocateString("x"))],
             "ord" => [Value.FromChar('A')],
             "chr" => [Value.FromLong(65)],
             _ => Enumerable

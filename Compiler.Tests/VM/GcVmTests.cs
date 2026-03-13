@@ -1,5 +1,5 @@
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Backend.JIT.CIL;
-using Compiler.Execution;
 using Compiler.Runtime.VM;
 using Compiler.Runtime.VM.Execution.GC;
 using Compiler.Runtime.VM.Options;

@@ -1,4 +1,4 @@
-namespace Compiler.Execution;
+namespace Compiler.Backend.JIT.Abstractions.Execution;
 
 /// <summary>
 ///     Runtime services required by compiled programs.
@@ -8,6 +8,9 @@ public interface IExecutionRuntime
 {
     VmArray AllocateArray(
         int length);
+
+    VmString AllocateString(
+        string value);
 
     void EnterFrame(
         Value[] locals);

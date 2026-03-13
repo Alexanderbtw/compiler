@@ -1,7 +1,7 @@
 using BenchmarkDotNet.Attributes;
 
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Backend.JIT.CIL;
-using Compiler.Execution;
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.MIR.Common;

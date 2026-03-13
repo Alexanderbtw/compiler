@@ -8,7 +8,6 @@ public static class CompilerInstrumentation
     public static readonly ActivitySource ActivitySource = new ActivitySource("Compiler.Tooling");
 
     public static readonly Meter Meter = new Meter("Compiler.Tooling");
-
     public static readonly Histogram<double> CompileDurationMs = Meter.CreateHistogram<double>(name: "compiler.backend.compile.duration.ms");
 
     public static readonly Histogram<double> ExecutionDurationMs = Meter.CreateHistogram<double>(name: "compiler.execution.duration.ms");

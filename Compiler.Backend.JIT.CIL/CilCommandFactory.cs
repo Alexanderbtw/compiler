@@ -14,14 +14,14 @@ public sealed class CilCommandFactory(
     public RootCommand Create()
     {
         var fileOption = new Option<FileInfo?>(
-            "--file",
+            name: "--file",
             "-f")
         {
             Description = "Path to the MiniLang source file."
         };
 
         var verboseOption = new Option<bool>(
-            "--verbose",
+            name: "--verbose",
             "-v")
         {
             Description = "Enable verbose compiler diagnostics."
@@ -56,7 +56,14 @@ public sealed class CilCommandFactory(
                 ? "on"
                 : "off"
         };
-        autoOption.AcceptOnlyFromAmong("on", "off", "true", "false", "1", "0");
+
+        autoOption.AcceptOnlyFromAmong(
+            "on",
+            "off",
+            "true",
+            "false",
+            "1",
+            "0");
 
         var statsOption = new Option<bool>("--vm-gc-stats")
         {
@@ -76,7 +83,9 @@ public sealed class CilCommandFactory(
         runCommand.Add(autoOption);
         runCommand.Add(statsOption);
 
-        runCommand.SetAction(async (parseResult, cancellationToken) =>
+        runCommand.SetAction(async (
+            parseResult,
+            cancellationToken) =>
         {
             FileInfo? file = parseResult.GetValue(fileOption);
             string autoMode = parseResult.GetValue(autoOption) ?? "on";

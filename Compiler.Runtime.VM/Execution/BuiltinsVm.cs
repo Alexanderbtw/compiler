@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Frontend.Translation.HIR.Metadata;
 
 namespace Compiler.Runtime.VM.Execution;
@@ -156,7 +156,8 @@ public static class BuiltinsVm
         if (args[0].Tag == ValueTag.String)
         {
             string s = args[0]
-                .AsString();
+                .AsString()
+                .Text;
 
             if (s.Length != 1)
             {

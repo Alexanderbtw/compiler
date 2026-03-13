@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.MIR.Common;

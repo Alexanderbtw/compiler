@@ -1,4 +1,4 @@
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Frontend.Translation.MIR.Common;
 
 namespace Compiler.Backend.JIT.Abstractions;

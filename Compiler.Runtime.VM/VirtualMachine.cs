@@ -1,4 +1,4 @@
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Runtime.VM.Execution.GC;
 using Compiler.Runtime.VM.Options;
 
@@ -31,12 +31,19 @@ public sealed class VirtualMachine : IExecutionRuntime
     {
         VmArray array = _gcHeap.AllocateArray(length);
 
-        if (_options.AutoCollect && _gcHeap.ShouldCollect())
-        {
-            _gcHeap.Collect(EnumerateAllRoots());
-        }
+        TryCollect();
 
         return array;
+    }
+
+    public VmString AllocateString(
+        string value)
+    {
+        VmString vmString = _gcHeap.AllocateString(value);
+
+        TryCollect();
+
+        return vmString;
     }
 
     public void EnterFrame(
@@ -76,6 +83,14 @@ public sealed class VirtualMachine : IExecutionRuntime
         foreach (Value v in _externalRootsProviders.SelectMany(provider => provider()))
         {
             yield return v;
+        }
+    }
+
+    private void TryCollect()
+    {
+        if (_options.AutoCollect && _gcHeap.ShouldCollect())
+        {
+            _gcHeap.Collect(EnumerateAllRoots());
         }
     }
 }

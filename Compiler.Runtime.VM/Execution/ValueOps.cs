@@ -1,4 +1,4 @@
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 
 namespace Compiler.Runtime.VM.Execution;
 
@@ -28,7 +28,9 @@ public static class ValueOps
             ValueTag.I64 => a.AsInt64() == b.AsInt64(),
             ValueTag.Bool => a.AsBool() == b.AsBool(),
             ValueTag.Char => a.AsChar() == b.AsChar(),
-            ValueTag.String => a.AsString() == b.AsString(),
+            ValueTag.String => a.AsString()
+                .Text == b.AsString()
+                .Text,
             ValueTag.Array => ReferenceEquals(
                 objA: a.Ref,
                 objB: b.Ref),
@@ -64,6 +66,7 @@ public static class ValueOps
         {
             ValueTag.String => Value.FromLong(
                 v.AsString()
+                    .Text
                     .Length),
             ValueTag.Array => Value.FromLong(
                 v.AsArray()
@@ -89,7 +92,9 @@ public static class ValueOps
             ValueTag.Null => false,
             ValueTag.I64 => v.AsInt64() != 0,
             ValueTag.Char => v.AsChar() != '\0',
-            ValueTag.String => !string.IsNullOrEmpty(v.AsString()),
+            ValueTag.String => !string.IsNullOrEmpty(
+                v.AsString()
+                    .Text),
             ValueTag.Array => v.AsArray()
                 .Length != 0,
             _ => v.Ref is not null

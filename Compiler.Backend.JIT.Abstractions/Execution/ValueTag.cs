@@ -1,4 +1,4 @@
-namespace Compiler.Execution;
+namespace Compiler.Backend.JIT.Abstractions.Execution;
 
 /// <summary>
 ///     Discriminant for the shared execution value tagged union.

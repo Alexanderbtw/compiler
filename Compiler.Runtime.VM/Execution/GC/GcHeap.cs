@@ -1,13 +1,13 @@
-// uses Value, ValueTag, VmArray
+// uses Value, ValueTag, VmArray, VmString
 
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Runtime.VM.Execution.Diagnostics;
 
 namespace Compiler.Runtime.VM.Execution.GC;
 
 /// <summary>
 ///     A tiny stop-the-world mark–sweep heap for VM-managed objects.
-///     Currently, tracks <see cref="VmArray" /> instances allocated by the VM and
+///     Tracks <see cref="VmArray" /> and <see cref="VmString" /> instances allocated by the VM and
 ///     reclaims those that are unreachable from the VM roots (operand stack and locals).
 ///     Objects themselves are ordinary managed instances; removing them from the registry
 ///     allows the CLR to collect them.
@@ -17,6 +17,7 @@ public sealed class GcHeap(
     double growthFactor = 2.0)
 {
     private readonly HashSet<VmArray> _allocatedArrays = [];
+    private readonly HashSet<VmString> _allocatedStrings = [];
 
     // Simple trigger based on number of live objects. Tune or replace with a byte-based threshold if needed.
     private readonly double _growthFactor = Math.Max(
@@ -31,6 +32,12 @@ public sealed class GcHeap(
 
     /// <summary>Total number of arrays currently registered as live.</summary>
     public int LiveArrayCount => _allocatedArrays.Count;
+
+    /// <summary>Total number of managed objects currently registered as live.</summary>
+    public int LiveObjectCount => _allocatedArrays.Count + _allocatedStrings.Count;
+
+    /// <summary>Total number of strings currently registered as live.</summary>
+    public int LiveStringCount => _allocatedStrings.Count;
 
     public int PeakLive { get; private set; }
 
@@ -52,18 +59,27 @@ public sealed class GcHeap(
         TotalAllocations++;
         VmRuntimeInstrumentation.ArrayAllocations.Add(1);
 
-        if (_allocatedArrays.Count > PeakLive)
-        {
-            PeakLive = _allocatedArrays.Count;
-        }
+        UpdatePeakLive();
 
         return array;
     }
 
+    public VmString AllocateString(
+        string value)
+    {
+        var vmString = new VmString(value);
+        _allocatedStrings.Add(vmString);
+        TotalAllocations++;
+        VmRuntimeInstrumentation.StringAllocations.Add(1);
+        UpdatePeakLive();
+
+        return vmString;
+    }
+
     /// <summary>
     ///     Perform a full stop-the-world collection.
-    ///     Marks all arrays reachable from <paramref name="roots" /> and
-    ///     sweeps unreachable arrays from the registry.
+    ///     Marks all managed objects reachable from <paramref name="roots" /> and
+    ///     sweeps unreachable objects from the registry.
     /// </summary>
     public void Collect(
         IEnumerable<Value> roots)
@@ -82,15 +98,18 @@ public sealed class GcHeap(
         // Seed from roots
         foreach (Value root in roots)
         {
-            if (root.Tag == ValueTag.Array)
+            switch (root.Tag)
             {
-                VmArray array = root.AsArray();
+                case ValueTag.Array:
+                    MarkArray(
+                        array: root.AsArray(),
+                        markStack: markStack);
 
-                if (_allocatedArrays.Contains(array) && !array.GcMarked)
-                {
-                    array.GcMarked = true;
-                    markStack.Push(array);
-                }
+                    break;
+                case ValueTag.String:
+                    MarkString(root.AsString());
+
+                    break;
             }
         }
 
@@ -104,21 +123,25 @@ public sealed class GcHeap(
             {
                 Value element = array[index];
 
-                if (element.Tag == ValueTag.Array)
+                switch (element.Tag)
                 {
-                    VmArray child = element.AsArray();
+                    case ValueTag.Array:
+                        MarkArray(
+                            array: element.AsArray(),
+                            markStack: markStack);
 
-                    if (_allocatedArrays.Contains(child) && !child.GcMarked)
-                    {
-                        child.GcMarked = true;
-                        markStack.Push(child);
-                    }
+                        break;
+                    case ValueTag.String:
+                        MarkString(element.AsString());
+
+                        break;
                 }
             }
         }
 
         // SWEEP
         var unreachable = new List<VmArray>();
+        var unreachableStrings = new List<VmString>();
 
         foreach (VmArray array in _allocatedArrays)
         {
@@ -132,24 +155,38 @@ public sealed class GcHeap(
             }
         }
 
+        foreach (VmString vmString in _allocatedStrings)
+        {
+            if (!vmString.GcMarked)
+            {
+                unreachableStrings.Add(vmString);
+            }
+            else
+            {
+                vmString.GcMarked = false;
+            }
+        }
+
         // Remove unreachable arrays from the registry (CLR will reclaim them later)
         foreach (VmArray dead in unreachable)
         {
             _allocatedArrays.Remove(dead);
         }
 
-        if (_allocatedArrays.Count > PeakLive)
+        foreach (VmString dead in unreachableStrings)
         {
-            PeakLive = _allocatedArrays.Count;
+            _allocatedStrings.Remove(dead);
         }
 
+        UpdatePeakLive();
+
         // if still near the threshold after collection, grow it to amortize cost
-        if (_allocatedArrays.Count >= CollectionThreshold)
+        if (LiveObjectCount >= CollectionThreshold)
         {
             var grown = (int)Math.Ceiling(CollectionThreshold * _growthFactor);
             CollectionThreshold = Math.Max(
                 val1: grown,
-                val2: _allocatedArrays.Count + 1);
+                val2: LiveObjectCount + 1);
         }
     }
 
@@ -159,7 +196,7 @@ public sealed class GcHeap(
             totalAllocations: TotalAllocations,
             collections: Collections,
             peakLive: PeakLive,
-            live: _allocatedArrays.Count,
+            live: LiveObjectCount,
             threshold: CollectionThreshold,
             growthFactor: _growthFactor);
     }
@@ -167,6 +204,34 @@ public sealed class GcHeap(
     /// <summary>Returns true if the heap suggests doing a collection after an allocation.</summary>
     public bool ShouldCollect()
     {
-        return _allocatedArrays.Count >= CollectionThreshold;
+        return LiveObjectCount >= CollectionThreshold;
+    }
+
+    private void MarkArray(
+        VmArray array,
+        Stack<VmArray> markStack)
+    {
+        if (_allocatedArrays.Contains(array) && !array.GcMarked)
+        {
+            array.GcMarked = true;
+            markStack.Push(array);
+        }
+    }
+
+    private void MarkString(
+        VmString vmString)
+    {
+        if (_allocatedStrings.Contains(vmString))
+        {
+            vmString.GcMarked = true;
+        }
+    }
+
+    private void UpdatePeakLive()
+    {
+        if (LiveObjectCount > PeakLive)
+        {
+            PeakLive = LiveObjectCount;
+        }
     }
 }

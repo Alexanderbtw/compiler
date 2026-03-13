@@ -1,8 +1,8 @@
-namespace Compiler.Execution;
+namespace Compiler.Backend.JIT.Abstractions.Execution;
 
 /// <summary>
 ///     Shared tagged union for compiled/runtime values.
-///     Keeps primitives inline and uses <see cref="Ref" /> for strings, arrays and opaque objects.
+///     Keeps primitives inline and uses <see cref="Ref" /> for managed strings, arrays and opaque objects.
 /// </summary>
 public readonly struct Value
 {
@@ -83,7 +83,8 @@ public readonly struct Value
         return o switch
         {
             null => Null,
-            string s => FromString(s),
+            string => throw new InvalidOperationException("Use the runtime to allocate managed strings."),
+            VmString s => FromString(s),
             VmArray a => FromArray(a),
             bool b => FromBool(b),
             char ch => FromChar(ch),
@@ -99,7 +100,7 @@ public readonly struct Value
     }
 
     public static Value FromString(
-        string s)
+        VmString s)
     {
         return new Value(
             tag: ValueTag.String,
@@ -137,10 +138,10 @@ public readonly struct Value
             : throw new InvalidOperationException("not i64");
     }
 
-    public string AsString()
+    public VmString AsString()
     {
         return Tag == ValueTag.String
-            ? (string)Ref!
+            ? (VmString)Ref!
             : throw new InvalidOperationException("not string");
     }
 
@@ -154,7 +155,8 @@ public readonly struct Value
                 ? "true"
                 : "false",
             ValueTag.Char => _char.ToString(),
-            ValueTag.String => (string)Ref!,
+            ValueTag.String => AsString()
+                .Text,
             ValueTag.Array => "[array]",
             _ => Ref?.ToString() ?? "null"
         };

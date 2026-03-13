@@ -1,5 +1,3 @@
-using System.CommandLine;
-
 using Compiler.Interpreter;
 using Compiler.Tooling.Options;
 
@@ -20,14 +18,14 @@ public sealed class InterpreterCommandFactoryTests
         int exitCode = await factory
             .Create()
             .Parse(
-                [
-                    "run",
-                    "--file",
-                    "program.minl",
-                    "--verbose",
-                    "--quiet",
-                    "--time"
-                ])
+            [
+                "run",
+                "--file",
+                "program.minl",
+                "--verbose",
+                "--quiet",
+                "--time"
+            ])
             .InvokeAsync();
 
         Assert.Equal(

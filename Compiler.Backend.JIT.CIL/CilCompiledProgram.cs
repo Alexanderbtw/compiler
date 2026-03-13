@@ -1,4 +1,4 @@
-using Compiler.Execution;
+using Compiler.Backend.JIT.Abstractions.Execution;
 
 namespace Compiler.Backend.JIT.CIL;
 

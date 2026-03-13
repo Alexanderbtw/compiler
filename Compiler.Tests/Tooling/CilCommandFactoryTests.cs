@@ -1,5 +1,3 @@
-using System.CommandLine;
-
 using Compiler.Backend.JIT.CIL;
 using Compiler.Tooling.Options;
 
@@ -21,21 +19,21 @@ public sealed class CilCommandFactoryTests
         int exitCode = await factory
             .Create()
             .Parse(
-                [
-                    "run",
-                    "--file",
-                    "program.minl",
-                    "--verbose",
-                    "--quiet",
-                    "--time",
-                    "--vm-gc-threshold",
-                    "64",
-                    "--vm-gc-growth",
-                    "1.25",
-                    "--vm-gc-auto",
-                    "off",
-                    "--vm-gc-stats"
-                ])
+            [
+                "run",
+                "--file",
+                "program.minl",
+                "--verbose",
+                "--quiet",
+                "--time",
+                "--vm-gc-threshold",
+                "64",
+                "--vm-gc-growth",
+                "1.25",
+                "--vm-gc-auto",
+                "off",
+                "--vm-gc-stats"
+            ])
             .InvokeAsync();
 
         Assert.Equal(
