@@ -1,103 +1,84 @@
 [Documentation](docs.md)
 
-# MiniLang — Compiler, VM, and CLR Backend
+# MiniLang
 
-Concise, end-to-end language toolchain: ANTLR → HIR → MIR → backends (CLR and custom VM), plus a tree-walking
-interpreter.
+MiniLang is an internal compiler/toolchain solution built around a single pipeline:
+ANTLR syntax tree -> HIR -> MIR -> execution hosts. The repository currently ships
+an interpreter, a CIL backend that targets the shared VM runtime contracts, a custom
+VM runtime with GC, shared tooling/hosting infrastructure, and an isolated
+`Experimental/Typing` area for incomplete type-system work.
 
-## What We Have
+## Solution Layout
 
-- Frontend
-    - ANTLR4 grammar to syntax tree, lowered to HIR
-    - Interpreter executes HIR directly
-- Middle-end
-    - HIR lowered to MIR
-- Backends
-    - MIR → CIL (runs on .NET CLR)
-    - MIR → IL (VM JIT; executes with custom VM runtime + GC)
-- VM Runtime
-    - Arrays, strings, arithmetic, control flow, built-ins (e.g., `array`, `len`)
-    - Stop-the-world mark–sweep GC with tunables: threshold, growth, opportunistic auto-collect
-    - GC statistics printing via `--vm-gc-stats`
-- Tests
-    - xUnit suite across frontend, MIR, interpreter, CLR backend, and VM
-
-## TODO / Roadmap
-
-- VM
-    - Rewrite stack-based VM to register-based design
-    - Broaden built-ins and error reporting
-- Optimizations
-    - Constant folding, dead-code elimination, CSE, inlining
-- IR & Backends
-    - Translate MIR → SSA
-- GC
-    - Tune/extend heuristics (e.g., generational or byte-based thresholds)
-- Tooling
-    - Benchmark harness and reports for provided tasks
-- Dynamic Optimizations
+- `Compiler.Frontend`
+  Grammar, lexer/parser generation, syntax entrypoints.
+- `Compiler.Frontend.Translation`
+  HIR/MIR models, lowering, semantics, builtins metadata, and `Experimental/Typing`.
+- `Compiler.Backend.JIT.Abstractions`
+  Backend/runtime execution contracts shared by compiled backends.
+- `Compiler.Backend.JIT.CIL`
+  CIL backend host and JIT implementation.
+- `Compiler.Runtime.VM`
+  VM runtime, values, arrays, GC, and builtin runtime support.
+- `Compiler.Interpreter`
+  Tree-walking interpreter host.
+- `Compiler.Tooling`
+  Shared host orchestration, pipeline wiring, command options, logging, and diagnostics.
+- `Compiler.Benchmarks`
+  BenchmarkDotNet harness for factorial, sorting, and prime-sieve workloads.
+- `Compiler.Tests`
+  xUnit regression, parity, architecture, CLI, and documentation checks.
 
 ## Build, Test, Format
 
 - Build: `dotnet build Compiler.sln -c Debug`
-- Test: `dotnet test --collect:"XPlat Code Coverage"`
+- Test: `dotnet test Compiler.sln`
 - Format: `dotnet format`
+
+Solution-wide SDK settings live in `Directory.Build.props`, package versions in
+`Directory.Packages.props`, and the pinned SDK in `global.json`.
 
 ## Run
 
-- Interpreter: `dotnet run --project Compiler.Interpreter [options] [file]`
-- CIL JIT (VM semantics): `dotnet run --project Compiler.Backend.JIT.CIL [options] [file]`
+The executable hosts use `System.CommandLine` with a `run` subcommand and are wired
+through `Microsoft.Extensions.Hosting`.
 
-Common options
+- Interpreter:
+  `dotnet run --project Compiler.Interpreter -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
+- CIL backend:
+  `dotnet run --project Compiler.Backend.JIT.CIL -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
 
-- `-h|--help` show help
-- `-v|--verbose` verbose logs (parse, return value)
-- `--quiet` suppress program stdout (builtins like `print`)
-- `--time` print total execution time (ms)
+Common options:
 
-VM GC options
+- `-f|--file` path to `.minl` source
+- `-v|--verbose` verbose compiler/runtime logging
+- `--quiet` suppress builtin stdout such as `print`
+- `--time` emit total execution time
 
-- `--vm-gc-threshold=N` initial VM heap collection threshold (objects)
-- `--vm-gc-growth=X` threshold growth factor (e.g., 1.5)
-- `--vm-gc-auto=on|off` enable/disable opportunistic collections
-- `--vm-gc-stats` print VM GC statistics after execution
+VM GC options for the CIL host:
 
-JITs
+- `--vm-gc-threshold <N>` initial heap collection threshold
+- `--vm-gc-growth <X>` threshold growth factor
+- `--vm-gc-auto <on|off>` enable or disable opportunistic collections
+- `--vm-gc-stats` print GC statistics after execution
 
-- The CIL JIT compiles MIR → IL and executes via the CLR JIT, but targets the VM runtime (Value/VmArray/GC) — not the
-  CLR object model.
-- The Native JIT compiles MIR → x64 machine code (work in progress). Both JITs share the same VM runtime and GC
-  integration.
+## Benchmarks
 
-Example GC stats output
+Run the benchmark harness in Release mode:
 
-```
-[gc] mode=vm auto=on threshold=64 growth=1.5
-[gc] allocations=128 collections=3 live=10 peak_live=70
-```
+- `dotnet run --project Compiler.Benchmarks -c Release`
 
-## Goal:
+The harness compares interpreter and CIL execution on:
 
-- Develop own language and virtual machine with automatic memory management and JIT compiler
+- recursive factorial
+- array sorting
+- prime number generation
 
-## Language Requirements:
+## Current Architecture Notes
 
-- Support of basic arithmetic operations
-- Conditional operators (if-else)
-- Loops (for, while)
-- Recursion
-
-## Tasks / Benchmarks
-
-- Task 1: Factorial Calculation (recursive)
-    - Validates recursion, stack, integer ops
-- Task 2: Array Sorting (e.g., quicksort/merge sort)
-    - Validates arrays, loops, comparisons
-- Task 3: Prime Number Generation (Sieve of Eratosthenes)
-    - Validates loops, arrays, arithmetic
-
-Benchmark targets
-
-- Factorial(20)
-- Sort 10,000 elements
-- Primes up to 100,000
+- `Compiler.Tooling` is intentionally limited to host/orchestration concerns. Core
+  language semantics stay in `Compiler.Frontend.Translation`.
+- `Compiler.Backend.JIT.Abstractions` does not depend on the VM implementation;
+  `Compiler.Runtime.VM` is now a concrete runtime.
+- `Experimental/Typing` is a deliberate WIP zone and is not part of the default
+  compilation pipeline.

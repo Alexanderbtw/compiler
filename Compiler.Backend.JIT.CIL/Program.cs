@@ -1,86 +1,31 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.CommandLine;
 
-using Compiler.Backend.VM;
-using Compiler.Backend.VM.Execution.GC;
-using Compiler.Backend.VM.Options;
-using Compiler.Backend.VM.Values;
-using Compiler.Frontend.Translation.CLI;
-using Compiler.Frontend.Translation.HIR.Common;
-using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Tooling;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Compiler.Backend.JIT.CIL;
 
-[ExcludeFromCodeCoverage]
 public class Program
 {
-    public static void Main(
+    public static async Task<int> Main(
         string[] args)
     {
-        CliArgs cli = CliArgs.Parse(args);
-        (GcOptions gcOptions, bool printStats) = GcCliArgs.Parse(args);
-        bool quiet = cli.Quiet;
-        bool measure = cli.Time;
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+        builder.Services.AddCompilerTooling();
+        builder.Services.AddSingleton<ICilRunner, CilRunner>();
+        builder.Services.AddSingleton<CilCommandFactory>();
 
-        string src;
+        using IHost host = builder.Build();
 
-        try
-        {
-            src = File.ReadAllText(cli.Path);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"error: failed to read '{cli.Path}': {ex.Message}");
+        RootCommand rootCommand = host
+            .Services
+            .GetRequiredService<CilCommandFactory>()
+            .Create();
 
-            return;
-        }
-
-        ProgramHir hir = FrontendPipeline.BuildHir(
-            src: src,
-            verbose: cli.Verbose);
-
-        MirModule mir = FrontendPipeline.BuildMir(hir);
-
-        Console.WriteLine(mir.ToString());
-
-        var vm = new VirtualMachine(options: gcOptions);
-        var jit = new MirJitCil();
-
-        TextWriter old = Console.Out;
-
-        if (quiet)
-        {
-            Console.SetOut(TextWriter.Null);
-        }
-
-        var sw = Stopwatch.StartNew();
-        Value ret = jit.Execute(
-            virtualMachine: vm,
-            mirModule: mir,
-            entryFunctionName: "main");
-
-        sw.Stop();
-
-        if (quiet)
-        {
-            Console.SetOut(old);
-        }
-
-        if (cli.Verbose)
-        {
-            Console.WriteLine($"[ret] {ret}");
-        }
-
-        if (measure)
-        {
-            Console.WriteLine($"[time] {sw.ElapsedMilliseconds} ms");
-        }
-
-        if (printStats)
-        {
-            GcStats s = vm.GetGcStats();
-            Console.WriteLine($"[gc] mode=vm auto={(gcOptions.AutoCollect ? "on" : "off")} threshold={s.Threshold} growth={s.GrowthFactor}");
-            Console.WriteLine($"[gc] allocations={s.TotalAllocations} collections={s.Collections} live={s.Live} peak_live={s.PeakLive}");
-        }
+        return await rootCommand
+            .Parse(args)
+            .InvokeAsync();
     }
 }

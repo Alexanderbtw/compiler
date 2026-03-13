@@ -1,3 +1,5 @@
+using Compiler.Frontend.Translation.Experimental.Typing;
+
 namespace Compiler.Frontend.Translation.HIR.Metadata;
 
 /// <summary>
@@ -9,5 +11,5 @@ public sealed record BuiltinDescriptor(
     int? MaxArity, // null => no upper bound
     BuiltinAttr Attributes,
     SimpleType ReturnType = SimpleType.Unknown,
-    SimpleType[]? ParamTypes = null, // may remain null until typing stage
+    SimpleType[]? ParamTypes = null, // may remain null until the experimental typing stage
     BuiltinLoweringKind Lowering = BuiltinLoweringKind.CallRuntime);

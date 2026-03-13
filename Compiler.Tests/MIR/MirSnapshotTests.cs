@@ -11,7 +11,7 @@ public sealed class MirSnapshotTests
     [Fact]
     public void Factorial_Mir_HasCoreShape()
     {
-        string src = @"
+        var src = @"
             fn fact(n) {
                 if (n <= 1) return 1;
                 return n * fact(n - 1);

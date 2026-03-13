@@ -1,14 +1,14 @@
 using System.Reflection;
 using System.Reflection.Emit;
 
-using Compiler.Backend.VM.Execution;
-using Compiler.Backend.VM.Values;
-using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Execution;
 using Compiler.Frontend.Translation.HIR.Metadata;
+using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Frontend.Translation.MIR.Operands;
 using Compiler.Frontend.Translation.MIR.Operands.Abstractions;
+using Compiler.Runtime.VM.Execution;
 
 namespace Compiler.Backend.JIT.CIL;
 
@@ -23,25 +23,26 @@ internal sealed class CilEmitter
     private static readonly MethodInfo MiBuiltins = typeof(BuiltinsVm)
         .GetMethod(
             name: nameof(BuiltinsVm.Invoke),
-            types: [typeof(string), typeof(VmJitContext), typeof(Value[])])!;
+            types: [typeof(string), typeof(IExecutionRuntime), typeof(Value[])])!;
 
-    private static readonly MethodInfo MiEnter = typeof(VmJitContext).GetMethod(nameof(VmJitContext.EnterFrame))!;
+    private static readonly MethodInfo MiEnter = typeof(CilExecutionContext).GetMethod(nameof(CilExecutionContext.EnterFrame))!;
     private static readonly MethodInfo MiEq = typeof(ValueOps).GetMethod(nameof(ValueOps.AreValuesEqual))!;
-    private static readonly MethodInfo MiExit = typeof(VmJitContext).GetMethod(nameof(VmJitContext.ExitFrame))!;
+    private static readonly MethodInfo MiExit = typeof(CilExecutionContext).GetMethod(nameof(CilExecutionContext.ExitFrame))!;
     private static readonly MethodInfo MiFromBool = typeof(Value).GetMethod(nameof(Value.FromBool))!;
     private static readonly MethodInfo MiFromChar = typeof(Value).GetMethod(nameof(Value.FromChar))!;
     private static readonly MethodInfo MiFromLong = typeof(Value).GetMethod(nameof(Value.FromLong))!;
     private static readonly MethodInfo MiFromString = typeof(Value).GetMethod(nameof(Value.FromString))!;
     private static readonly MethodInfo MiGet = typeof(ValueOps).GetMethod(nameof(ValueOps.Get))!;
     private static readonly MethodInfo MiI64 = typeof(ValueOps).GetMethod(nameof(ValueOps.I64))!;
-    private static readonly MethodInfo MiInvokeFn = typeof(VmJitContext).GetMethod(nameof(VmJitContext.InvokeFunction))!;
+    private static readonly MethodInfo MiInvokeFn = typeof(CilExecutionContext).GetMethod(nameof(CilExecutionContext.InvokeFunction))!;
+    private static readonly MethodInfo MiRuntime = typeof(CilExecutionContext).GetProperty(nameof(CilExecutionContext.Runtime))!.GetMethod!;
     private static readonly MethodInfo MiSet = typeof(ValueOps).GetMethod(nameof(ValueOps.Set))!;
     private static readonly MethodInfo MiToBool = typeof(ValueOps).GetMethod(nameof(ValueOps.ToBool))!;
 
     public static CilModule EmitModule(
         MirModule mir)
     {
-        var map = new Dictionary<string, VmJitFunc>(
+        var map = new Dictionary<string, CilJitFunc>(
             capacity: mir.Functions.Count,
             comparer: StringComparer.Ordinal);
 
@@ -53,7 +54,7 @@ internal sealed class CilEmitter
         return new CilModule(map);
     }
 
-    private static VmJitFunc CompileFunction(
+    private static CilJitFunc CompileFunction(
         MirFunction func)
     {
         // Compute max vreg id for locals array sizing
@@ -185,7 +186,7 @@ internal sealed class CilEmitter
         var dm = new DynamicMethod(
             name: $"ciljit_{func.Name}",
             returnType: typeof(Value),
-            parameterTypes: new[] { typeof(VmJitContext), typeof(Value[]) },
+            parameterTypes: new[] { typeof(CilExecutionContext), typeof(Value[]) },
             m: typeof(CilEmitter).Module,
             skipVisibility: true);
 
@@ -218,7 +219,7 @@ internal sealed class CilEmitter
             meth: MiEnter);
 
         // Bind args to param regs
-        for (int i = 0; i < func.ParamRegs.Count; i++)
+        for (var i = 0; i < func.ParamRegs.Count; i++)
         {
             il.Emit(
                 opcode: OpCodes.Ldloc,
@@ -617,7 +618,7 @@ internal sealed class CilEmitter
                                 opcode: OpCodes.Stloc,
                                 local: argsArr);
 
-                            for (int i = 0; i < argc; i++)
+                            for (var i = 0; i < argc; i++)
                             {
                                 il.Emit(
                                     opcode: OpCodes.Ldloc,
@@ -641,12 +642,16 @@ internal sealed class CilEmitter
 
                             if (IsBuiltinName(callee))
                             {
-                                // BuiltinsVm.Invoke(callee, ctx, args)
+                                // BuiltinsVm.Invoke(callee, ctx.Runtime, args)
                                 il.Emit(
                                     opcode: OpCodes.Ldstr,
                                     str: callee);
 
                                 il.Emit(OpCodes.Ldarg_0);
+                                il.Emit(
+                                    opcode: OpCodes.Callvirt,
+                                    meth: MiRuntime);
+
                                 il.Emit(
                                     opcode: OpCodes.Ldloc,
                                     local: argsArr);
@@ -776,7 +781,7 @@ internal sealed class CilEmitter
 
         il.Emit(OpCodes.Ret);
 
-        return (VmJitFunc)dm.CreateDelegate(typeof(VmJitFunc));
+        return (CilJitFunc)dm.CreateDelegate(typeof(CilJitFunc));
     }
 
     private static void EmitLoadOperand(
@@ -897,11 +902,11 @@ internal sealed class CilEmitter
     internal sealed class CilModule
     {
         public CilModule(
-            IReadOnlyDictionary<string, VmJitFunc> functions)
+            IReadOnlyDictionary<string, CilJitFunc> functions)
         {
             Functions = functions;
         }
 
-        public IReadOnlyDictionary<string, VmJitFunc> Functions { get; }
+        public IReadOnlyDictionary<string, CilJitFunc> Functions { get; }
     }
 }

@@ -1,7 +1,8 @@
 using Compiler.Backend.JIT.CIL;
-using Compiler.Backend.VM;
-using Compiler.Backend.VM.Execution.GC;
-using Compiler.Backend.VM.Options;
+using Compiler.Execution;
+using Compiler.Runtime.VM;
+using Compiler.Runtime.VM.Execution.GC;
+using Compiler.Runtime.VM.Options;
 
 namespace Compiler.Tests.VM;
 
@@ -19,9 +20,9 @@ public sealed class GcVmTests
 
         var vm = new VirtualMachine(options: opts);
         var jit = new MirJitCil();
-        jit.Execute(
-            virtualMachine: vm,
-            mirModule: TestUtils.BuildMir(AllocLoopSrc),
+        ICompiledProgram program = jit.Compile(TestUtils.BuildMir(AllocLoopSrc));
+        program.Execute(
+            runtime: vm,
             entryFunctionName: "main");
 
         GcStats s = vm.GetGcStats();
@@ -43,9 +44,9 @@ public sealed class GcVmTests
 
         var vm = new VirtualMachine(options: opts);
         var jit = new MirJitCil();
-        jit.Execute(
-            virtualMachine: vm,
-            mirModule: TestUtils.BuildMir(AllocLoopSrc),
+        ICompiledProgram program = jit.Compile(TestUtils.BuildMir(AllocLoopSrc));
+        program.Execute(
+            runtime: vm,
             entryFunctionName: "main");
 
         GcStats s = vm.GetGcStats();

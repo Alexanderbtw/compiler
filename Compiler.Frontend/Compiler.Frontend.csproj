@@ -1,10 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
   <ItemGroup>
     <Antlr4 Include="MiniLangLexer.g4">
       <Package>Compiler.Frontend</Package>
@@ -15,8 +9,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1"/>
-    <PackageReference Include="Antlr4BuildTasks" Version="12.10.0" PrivateAssets="all"/>
+    <PackageReference Include="Antlr4.Runtime.Standard"/>
+    <PackageReference Include="Antlr4BuildTasks" PrivateAssets="all"/>
   </ItemGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

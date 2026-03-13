@@ -28,7 +28,7 @@ public sealed class MirFunction(
 
     public List<VReg> ParamRegs { get; } = [];
 
-    // Minimal type info for virtual registers (filled by MirTypeAnnotator)
+    // Experimental typing annotations; the main pipeline does not rely on them yet.
     public Dictionary<int, MType> Types { get; } = new Dictionary<int, MType>();
 
     public MirBlock NewBlock(

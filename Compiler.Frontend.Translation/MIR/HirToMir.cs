@@ -32,6 +32,29 @@ public sealed class HirToMir
         return context.Module;
     }
 
+    private static MBinOp MapBin(
+        BinOp op)
+    {
+        return op switch
+        {
+            BinOp.Add => MBinOp.Add, BinOp.Sub => MBinOp.Sub, BinOp.Mul => MBinOp.Mul,
+            BinOp.Div => MBinOp.Div, BinOp.Mod => MBinOp.Mod,
+            BinOp.Lt => MBinOp.Lt, BinOp.Le => MBinOp.Le, BinOp.Gt => MBinOp.Gt, BinOp.Ge => MBinOp.Ge,
+            BinOp.Eq => MBinOp.Eq, BinOp.Ne => MBinOp.Ne,
+            _ => throw new NotSupportedException($"bin op {op} not supported in MIR")
+        };
+    }
+
+    private static MUnOp MapUn(
+        UnOp op)
+    {
+        return op switch
+        {
+            UnOp.Neg => MUnOp.Neg, UnOp.Not => MUnOp.Not, UnOp.Plus => MUnOp.Plus,
+            _ => throw new NotSupportedException($"un op {op} not supported in MIR")
+        };
+    }
+
     private MOperand LowerExpression(
         LoweringContext context,
         ExprHir expr)
@@ -316,7 +339,7 @@ public sealed class HirToMir
 
                 break;
 
-            case LetHir letStmt:
+            case VarDeclHir letStmt:
                 {
                     VReg? destination = context.DefineVariable(letStmt.Name);
 
@@ -457,36 +480,13 @@ public sealed class HirToMir
         }
     }
 
-    private static MBinOp MapBin(
-        BinOp op)
-    {
-        return op switch
-        {
-            BinOp.Add => MBinOp.Add, BinOp.Sub => MBinOp.Sub, BinOp.Mul => MBinOp.Mul,
-            BinOp.Div => MBinOp.Div, BinOp.Mod => MBinOp.Mod,
-            BinOp.Lt => MBinOp.Lt, BinOp.Le => MBinOp.Le, BinOp.Gt => MBinOp.Gt, BinOp.Ge => MBinOp.Ge,
-            BinOp.Eq => MBinOp.Eq, BinOp.Ne => MBinOp.Ne,
-            _ => throw new NotSupportedException($"bin op {op} not supported in MIR")
-        };
-    }
-
-    private static MUnOp MapUn(
-        UnOp op)
-    {
-        return op switch
-        {
-            UnOp.Neg => MUnOp.Neg, UnOp.Not => MUnOp.Not, UnOp.Plus => MUnOp.Plus,
-            _ => throw new NotSupportedException($"un op {op} not supported in MIR")
-        };
-    }
-
     private sealed class LoweringContext
     {
-        public MirBlock CurrentBlock = null!;
-        public MirFunction CurrentFunction = null!;
         public readonly Stack<(MirBlock BreakTarget, MirBlock ContinueTarget)> LoopTargets = new Stack<(MirBlock BreakTarget, MirBlock ContinueTarget)>();
         public readonly MirModule Module = new MirModule();
         private readonly Stack<Dictionary<string, VReg?>> _scopes = new Stack<Dictionary<string, VReg?>>();
+        public MirBlock CurrentBlock = null!;
+        public MirFunction CurrentFunction = null!;
 
         public VReg DefineVariable(
             string name)

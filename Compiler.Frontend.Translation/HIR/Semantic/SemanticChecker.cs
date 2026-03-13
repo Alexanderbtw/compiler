@@ -17,13 +17,12 @@ namespace Compiler.Frontend.Translation.HIR.Semantic;
 /// </summary>
 public sealed class SemanticChecker
 {
-    private FuncHir? _currentFunc;
-
     private readonly List<string> _errors = [];
 
     private readonly Dictionary<string, FuncSymbol> _funcs = new Dictionary<string, FuncSymbol>();
-    private int _loops;
     private readonly Stack<Dictionary<string, Symbol>> _values = new Stack<Dictionary<string, Symbol>>();
+    private FuncHir? _currentFunc;
+    private int _loops;
 
     public void Check(
         ProgramHir prog)
@@ -65,25 +64,6 @@ public sealed class SemanticChecker
         }
     }
 
-    private bool TryAddValue(
-        string name,
-        Symbol s,
-        string dupMsg)
-    {
-        Dictionary<string, Symbol> table = _values.Peek();
-
-        if (!table.TryAdd(
-                key: name,
-                value: s))
-        {
-            Error(dupMsg);
-
-            return false;
-        }
-
-        return true;
-    }
-
     private void CheckBuiltinArity(
         string name,
         int argCount,
@@ -96,7 +76,7 @@ public sealed class SemanticChecker
             return; // not a builtin — should not happen if Exists returned true
         }
 
-        bool ok = false;
+        var ok = false;
 
         foreach (BuiltinDescriptor d in cands)
         {
@@ -203,6 +183,25 @@ public sealed class SemanticChecker
         }
 
         return null;
+    }
+
+    private bool TryAddValue(
+        string name,
+        Symbol s,
+        string dupMsg)
+    {
+        Dictionary<string, Symbol> table = _values.Peek();
+
+        if (!table.TryAdd(
+                key: name,
+                value: s))
+        {
+            Error(dupMsg);
+
+            return false;
+        }
+
+        return true;
     }
 
     private void VisitBlock(
@@ -322,7 +321,7 @@ public sealed class SemanticChecker
     }
 
     private void VisitLet(
-        LetHir vd)
+        VarDeclHir vd)
     {
         if (TryAddValue(
                 name: vd.Name,
@@ -341,7 +340,7 @@ public sealed class SemanticChecker
     {
         switch (s)
         {
-            case LetHir vd:
+            case VarDeclHir vd:
                 VisitLet(vd);
 
                 break;

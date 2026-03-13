@@ -442,7 +442,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
                 Span: Span(ctx));
     }
 
-    public override LetHir VisitVariableDecl(
+    public override VarDeclHir VisitVariableDecl(
         MiniLangParser.VariableDeclContext ctx)
     {
         string? id = ctx
@@ -453,7 +453,7 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             ? null
             : (ExprHir)Visit(ctx.expression());
 
-        return new LetHir(
+        return new VarDeclHir(
             Name: id,
             Init: init,
             Span: Span(ctx));
@@ -466,43 +466,6 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             Cond: (ExprHir)Visit(ctx.expression()),
             Body: (StmtHir)Visit(ctx.statement()),
             Span: Span(ctx));
-    }
-
-    private ExprHir BuildLeftAssoc<T>(
-        IReadOnlyList<T> terms,
-        IReadOnlyList<ITerminalNode> ops)
-        where T : ParserRuleContext
-    {
-        var e = (ExprHir)Visit(terms[0]);
-
-        for (var i = 0; i < ops.Count; i++)
-        {
-            BinOp op = BinMap[ops[i]
-                .GetText()];
-
-            e = new BinHir(
-                Op: op,
-                Left: e,
-                Right: (ExprHir)Visit(terms[i + 1]),
-                Span: Span(terms[i]));
-        }
-
-        return e;
-    }
-
-    private BlockHir ExprListToBlock(
-        MiniLangParser.ExpressionListContext listCtx)
-    {
-        List<StmtHir> stmts = listCtx
-            .expression()
-            .Select(e => (StmtHir)new ExprStmtHir(
-                Expr: (ExprHir)Visit(e),
-                Span: Span(e)))
-            .ToList();
-
-        return new BlockHir(
-            Statements: stmts,
-            Span: Span(listCtx));
     }
 
     private static List<ITerminalNode> ExtractOps(
@@ -557,5 +520,42 @@ public sealed class HirBuilder : MiniLangParserBaseVisitor<object>
             .Replace(
                 oldValue: "\\\\",
                 newValue: "\\");
+    }
+
+    private ExprHir BuildLeftAssoc<T>(
+        IReadOnlyList<T> terms,
+        IReadOnlyList<ITerminalNode> ops)
+        where T : ParserRuleContext
+    {
+        var e = (ExprHir)Visit(terms[0]);
+
+        for (var i = 0; i < ops.Count; i++)
+        {
+            BinOp op = BinMap[ops[i]
+                .GetText()];
+
+            e = new BinHir(
+                Op: op,
+                Left: e,
+                Right: (ExprHir)Visit(terms[i + 1]),
+                Span: Span(terms[i]));
+        }
+
+        return e;
+    }
+
+    private BlockHir ExprListToBlock(
+        MiniLangParser.ExpressionListContext listCtx)
+    {
+        List<StmtHir> stmts = listCtx
+            .expression()
+            .Select(e => (StmtHir)new ExprStmtHir(
+                Expr: (ExprHir)Visit(e),
+                Span: Span(e)))
+            .ToList();
+
+        return new BlockHir(
+            Statements: stmts,
+            Span: Span(listCtx));
     }
 }

@@ -11,11 +11,11 @@ public sealed class HirBuilderTests
     public void CharLiteralNodePresent()
     {
         ProgramHir hir = TestUtils.BuildHir("fn main(){ var c = 'A'; }");
-        LetHir let = hir
+        VarDeclHir let = hir
             .Functions[0]
             .Body
             .Statements
-            .OfType<LetHir>()
+            .OfType<VarDeclHir>()
             .First();
 
         var charNode = let.Init as CharHir;
@@ -38,7 +38,7 @@ public sealed class HirBuilderTests
     [Fact]
     public void FactorialHir_OK()
     {
-        string src = @"
+        var src = @"
             fn fact(n) {
                 if (n <= 1) return 1;
                 return n * fact(n - 1);
@@ -54,7 +54,7 @@ public sealed class HirBuilderTests
     [Fact]
     public void ForLoop_ExpressionLists_AreDesugaredToWhile()
     {
-        string src = @"
+        var src = @"
             fn main() {
                 var i = 0;
                 var j = 10;
@@ -101,7 +101,7 @@ public sealed class HirBuilderTests
     [Fact]
     public void IndexAndCall()
     {
-        string src = @"
+        var src = @"
         fn get(a, i) { return a[i]; }
         fn main() {
             var arr = array(3);

@@ -4,13 +4,13 @@ using System.Text;
 using Antlr4.Runtime;
 
 using Compiler.Backend.JIT.CIL;
-using Compiler.Backend.VM;
-using Compiler.Backend.VM.Values;
+using Compiler.Execution;
 using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR;
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Expressions;
 using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
+using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.HIR.Semantic;
 using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
 using Compiler.Frontend.Translation.HIR.Statements;
@@ -19,6 +19,7 @@ using Compiler.Frontend.Translation.MIR;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
+using Compiler.Runtime.VM;
 
 using Xunit.Abstractions;
 using Xunit.Sdk;
@@ -161,7 +162,7 @@ internal static class TestUtils
         return s switch
         {
             BlockHir b => b.Statements.SelectMany(FlattenStmts),
-            LetHir v => v.Init is null
+            VarDeclHir v => v.Init is null
                 ? []
                 : FlattenExpr(v.Init),
             ExprStmtHir e => e.Expr is null
@@ -214,18 +215,14 @@ internal static class TestUtils
         var interp = new Interpreter.Interpreter(hir);
 
         var sb = new StringBuilder();
-        TextWriter old = Console.Out;
-        Console.SetOut(new StringWriter(sb));
+        using var writer = new StringWriter(sb);
+        using IDisposable _ = BuiltinsCore.PushWriter(writer);
 
-        try
-        {
-            object? ret = interp.Run();
+        object? ret = interp.Run();
 
-            return (ret, sb
-                .ToString()
-                .TrimEnd());
-        }
-        finally { Console.SetOut(old); }
+        return (ret, sb
+            .ToString()
+            .TrimEnd());
     }
 
     public static (object? ret, string stdout) RunVmMirJit(
@@ -235,22 +232,18 @@ internal static class TestUtils
         var vm = new VirtualMachine();
 
         var sb = new StringBuilder();
-        TextWriter old = Console.Out;
-        Console.SetOut(new StringWriter(sb));
+        using var writer = new StringWriter(sb);
+        using IDisposable _ = BuiltinsCore.PushWriter(writer);
 
-        try
-        {
-            var jit = new MirJitCil();
-            Value v = jit.Execute(
-                virtualMachine: vm,
-                mirModule: mir,
-                entryFunctionName: "main");
+        var jit = new MirJitCil();
+        ICompiledProgram program = jit.Compile(mir);
+        Value v = program.Execute(
+            runtime: vm,
+            entryFunctionName: "main");
 
-            return (TryUnwrapVmValue(v), sb
-                .ToString()
-                .TrimEnd());
-        }
-        finally { Console.SetOut(old); }
+        return (TryUnwrapVmValue(v), sb
+            .ToString()
+            .TrimEnd());
     }
 
     private static void AssertReturnEqual(
@@ -301,7 +294,7 @@ internal static class TestUtils
                         expected: earr.Length,
                         actual: arr.Length);
 
-                    for (int i = 0; i < earr.Length; i++)
+                    for (var i = 0; i < earr.Length; i++)
                     {
                         switch (earr[i])
                         {
@@ -590,9 +583,9 @@ internal static class TestUtils
     private static object?[] VmArrayToHostArray(
         VmArray arr)
     {
-        object?[] res = new object?[arr.Length];
+        var res = new object?[arr.Length];
 
-        for (int i = 0; i < arr.Length; i++)
+        for (var i = 0; i < arr.Length; i++)
         {
             res[i] = TryUnwrapVmValue(arr.Data[i]);
         }

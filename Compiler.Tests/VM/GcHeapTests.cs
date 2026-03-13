@@ -1,5 +1,5 @@
-using Compiler.Backend.VM.Execution.GC;
-using Compiler.Backend.VM.Values;
+using Compiler.Execution;
+using Compiler.Runtime.VM.Execution.GC;
 
 namespace Compiler.Tests.VM;
 
@@ -44,8 +44,8 @@ public sealed class GcHeapTests
     [Fact]
     public void Threshold_Grows_When_Many_Live()
     {
-        int initial = 16;
-        double growth = 1.5;
+        var initial = 16;
+        var growth = 1.5;
         var heap = new GcHeap(
             initialThreshold: initial,
             growthFactor: growth);
@@ -53,7 +53,7 @@ public sealed class GcHeapTests
         // Create a root array that will reference many children to keep them live
         VmArray root = heap.AllocateArray(initial);
 
-        for (int i = 0; i < initial; i++)
+        for (var i = 0; i < initial; i++)
         {
             root[i] = Value.FromArray(heap.AllocateArray(1));
         }

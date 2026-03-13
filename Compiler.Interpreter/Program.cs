@@ -1,48 +1,31 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
+﻿using System.CommandLine;
 
-using Compiler.Frontend.Translation.CLI;
-using Compiler.Frontend.Translation.HIR.Common;
+using Compiler.Tooling;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Compiler.Interpreter;
 
-[ExcludeFromCodeCoverage]
-
-/// <summary>
-/// Minimal CLI runner for the HIR interpreter.
-/// Reads source, builds HIR, and executes it directly.
-/// </summary>
 public class Program
 {
-    public static void Main(
+    public static async Task<int> Main(
         string[] args)
     {
-        CliArgs cliArgs = CliArgs.Parse(args);
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+        builder.Services.AddCompilerTooling();
+        builder.Services.AddSingleton<IInterpreterRunner, InterpreterRunner>();
+        builder.Services.AddSingleton<InterpreterCommandFactory>();
 
-        string src;
+        using IHost host = builder.Build();
 
-        try
-        {
-            src = File.ReadAllText(cliArgs.Path);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"error: failed to read '{cliArgs.Path}': {ex.Message}");
+        RootCommand rootCommand = host
+            .Services
+            .GetRequiredService<InterpreterCommandFactory>()
+            .Create();
 
-            return;
-        }
-
-        ProgramHir hir = FrontendPipeline.BuildHir(
-            src: src,
-            verbose: cliArgs.Verbose);
-
-        var interpreter = new Interpreter(hir);
-        object? ret = interpreter.Run();
-
-        if (cliArgs.Verbose)
-        {
-            Console.WriteLine($"[ret] {ret ?? "null"}");
-        }
+        return await rootCommand
+            .Parse(args)
+            .InvokeAsync();
     }
 }

@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Expressions;
@@ -132,6 +129,31 @@ public sealed class Interpreter
             index: index);
     }
 
+    private static bool IsTrue(
+        object? v)
+    {
+        return v switch
+        {
+            bool b => b,
+            long n => n != 0,
+            _ => v != null
+        };
+    }
+
+    private static long ToLong(
+        object? v)
+    {
+        return v switch
+        {
+            long n => n,
+            bool b => b
+                ? 1
+                : 0,
+            null => throw new RuntimeException("null used where integer expected"),
+            _ => throw new RuntimeException($"cannot use {v.GetType().Name} in arithmetic")
+        };
+    }
+
     private object? Call(
         string name,
         object?[] args)
@@ -158,7 +180,7 @@ public sealed class Interpreter
 
         var frame = new Frame();
 
-        for (int i = 0; i < args.Length; i++)
+        for (var i = 0; i < args.Length; i++)
         {
             frame.Locals[f.Parameters[i]] = args[i];
         }
@@ -264,7 +286,7 @@ public sealed class Interpreter
     {
         switch (s)
         {
-            case LetHir v:
+            case VarDeclHir v:
                 _stack
                     .Peek()
                     .Locals[v.Name] = Eval(v.Init);
@@ -312,17 +334,6 @@ public sealed class Interpreter
         }
     }
 
-    private static bool IsTrue(
-        object? v)
-    {
-        return v switch
-        {
-            bool b => b,
-            long n => n != 0,
-            _ => v != null
-        };
-    }
-
     private object? Lookup(
         string name)
     {
@@ -354,20 +365,6 @@ public sealed class Interpreter
         }
 
         throw new RuntimeException($"unbound variable '{name}'");
-    }
-
-    private static long ToLong(
-        object? v)
-    {
-        return v switch
-        {
-            long n => n,
-            bool b => b
-                ? 1
-                : 0,
-            null => throw new RuntimeException("null used where integer expected"),
-            _ => throw new RuntimeException($"cannot use {v.GetType().Name} in arithmetic")
-        };
     }
 
     private sealed class Frame

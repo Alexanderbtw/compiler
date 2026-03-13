@@ -1,3 +1,5 @@
+using Compiler.Frontend.Translation.Experimental.Typing;
+
 namespace Compiler.Frontend.Translation.HIR.Metadata;
 
 using static BuiltinAttr;
@@ -70,7 +72,7 @@ public static class Builtins
                 MinArity: 1,
                 MaxArity: 1,
                 Attributes: None, // allocation: not Pure/Foldable
-                ReturnType: SimpleType.Unknown, // effectively returns object?[]; could model as Array(T) for typing
+                ReturnType: SimpleType.Unknown, // effectively returns object?[]; kept broad until experimental typing matures
                 Lowering: CallRuntime),
 
             // array(len, init)

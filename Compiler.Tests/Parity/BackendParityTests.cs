@@ -5,7 +5,7 @@ public sealed class BackendParityTests
     [Fact]
     public void ArrayInit_FillsElements_ParityAcrossBackends()
     {
-        string src = @"fn main() {
+        var src = @"fn main() {
             var a = array(5, 42);
             assert(len(a) == 5);
             assert(a[0] == 42);
@@ -33,7 +33,7 @@ public sealed class BackendParityTests
     [Fact]
     public void Assert_WithMessage_ThrowsAcrossBackends()
     {
-        string src = "fn main() { assert(0, \"boom\"); }";
+        var src = "fn main() { assert(0, \"boom\"); }";
 
         void AssertThrows(
             Func<string, (object? ret, string stdout)> runner)
@@ -52,7 +52,7 @@ public sealed class BackendParityTests
     [Fact]
     public void ChrOrd_Roundtrip_ParityAcrossBackends()
     {
-        string src = @"fn main() {
+        var src = @"fn main() {
             var c = chr(ord('Z'));
             assert(c == 'Z');
             print(c);

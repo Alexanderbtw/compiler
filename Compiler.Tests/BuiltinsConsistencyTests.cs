@@ -1,7 +1,7 @@
-using Compiler.Backend.VM;
-using Compiler.Backend.VM.Execution;
-using Compiler.Backend.VM.Values;
+using Compiler.Execution;
 using Compiler.Frontend.Translation.HIR.Metadata;
+using Compiler.Runtime.VM;
+using Compiler.Runtime.VM.Execution;
 
 namespace Compiler.Tests;
 
@@ -11,7 +11,6 @@ public sealed class BuiltinsConsistencyTests
     public void All_Builtins_Have_Implementations_In_VM_And_Interpreter()
     {
         var vm = new VirtualMachine();
-        var ctx = new VmJitContext(vm);
 
         foreach (KeyValuePair<string, List<BuiltinDescriptor>> kv in Builtins.Table)
         {
@@ -43,7 +42,7 @@ public sealed class BuiltinsConsistencyTests
             {
                 _ = BuiltinsVm.Invoke(
                     name: name,
-                    ctx: ctx,
+                    runtime: vm,
                     args: vmArgs);
             }
             catch (Exception ex)

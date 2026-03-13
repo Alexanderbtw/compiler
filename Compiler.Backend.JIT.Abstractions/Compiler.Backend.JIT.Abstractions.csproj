@@ -1,13 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
+  </ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\Compiler.Backend.VM\Compiler.Backend.VM.csproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Compiler.Runtime.VM"/>
+  </ItemGroup>
 
 </Project>

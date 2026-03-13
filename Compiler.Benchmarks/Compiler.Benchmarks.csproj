@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet"/>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Compiler.Backend.JIT.CIL\Compiler.Backend.JIT.CIL.csproj"/>
+    <ProjectReference Include="..\Compiler.Runtime.VM\Compiler.Runtime.VM.csproj"/>
+    <ProjectReference Include="..\Compiler.Interpreter\Compiler.Interpreter.csproj"/>
+    <ProjectReference Include="..\Compiler.Tooling\Compiler.Tooling.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Compiler.Tests\Tasks\*.minl"
+          Link="Tasks\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"/>
+  </ItemGroup>
+</Project>

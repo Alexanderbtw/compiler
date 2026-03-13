@@ -1,5 +1,3 @@
-using System;
-
 namespace Compiler.Interpreter.Signals;
 
 /// <summary>

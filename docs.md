@@ -1,29 +1,50 @@
 # MiniLang – Reference Manual
 
-MiniLang is a tiny, dynamically typed, C‑style language that drives a full pipeline: lexer → parser → HIR → MIR →
-backends (CLR and a custom VM), plus a tree‑walking interpreter. Program files use the extension `.minl`.
+MiniLang is a tiny, dynamically typed, C-style language that drives a full pipeline:
+lexer -> parser -> HIR -> MIR -> execution hosts. The solution contains an interpreter,
+a CIL backend that targets shared VM runtime contracts, a custom VM runtime with GC,
+shared host/tooling infrastructure in `Compiler.Tooling`, and an isolated
+`Experimental/Typing` area for incomplete type-system work. Program files use the
+extension `.minl`.
 
 ## Repository Structure
 
 - Solution: `Compiler.sln`
-- Projects: `Compiler.Frontend`, `Compiler.Frontend.Translation`, `Compiler.Interpreter`, `Compiler.Backend.CLR`,
-  `Compiler.Backend.VM`, `Compiler.Tests`
+- Projects:
+  `Compiler.Frontend`,
+  `Compiler.Frontend.Translation`,
+  `Compiler.Backend.JIT.Abstractions`,
+  `Compiler.Backend.JIT.CIL`,
+  `Compiler.Runtime.VM`,
+  `Compiler.Interpreter`,
+  `Compiler.Tooling`,
+  `Compiler.Benchmarks`,
+  `Compiler.Tests`
+- Shared solution settings:
+  `Directory.Build.props`,
+  `Directory.Packages.props`,
+  `global.json`
 
 ## Build & Test
 
 - Build: `dotnet build Compiler.sln -c Debug`
-- Test: `dotnet test --collect:"XPlat Code Coverage"`
+- Test: `dotnet test Compiler.sln`
 - Format: `dotnet format`
 
 ## Run
 
-- Interpreter: `dotnet run --project Compiler.Interpreter [options] [file]`
-- CIL JIT (VM semantics): `dotnet run --project Compiler.Backend.JIT.CIL [options] [file]`
+The executable hosts use `System.CommandLine` and `Microsoft.Extensions.Hosting`.
+
+- Interpreter:
+  `dotnet run --project Compiler.Interpreter -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
+- CIL JIT (VM semantics):
+  `dotnet run --project Compiler.Backend.JIT.CIL -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
 
 ### Common options
 
 - `-h|--help` show help
-- `-v|--verbose` verbose logs (parse, return)
+- `-f|--file <path>` path to `.minl` source file
+- `-v|--verbose` verbose logs (parse, MIR dump, return, timing)
 - `--quiet` suppress program stdout (builtins like `print`)
 - `--time` print total execution time (ms)
 
@@ -36,9 +57,16 @@ backends (CLR and a custom VM), plus a tree‑walking interpreter. Program files
 
 ### JITs
 
-- CIL JIT compiles MIR → IL and executes via CLR JIT. It implements VM semantics (Value/VmArray/Builtins) and integrates
-  with the VM GC.
+- CIL JIT compiles MIR -> IL and executes via the CLR JIT. It implements VM semantics
+  through the shared execution contracts and integrates with the VM GC runtime.
 - Native JIT compiles MIR → x64 machine code (in progress), sharing the same VM runtime contracts.
+
+## Benchmarks
+
+- Run benchmark harness:
+  `dotnet run --project Compiler.Benchmarks -c Release`
+- Covered workloads:
+  factorial, array sorting, prime number generation
 
 Example GC stats output
 
