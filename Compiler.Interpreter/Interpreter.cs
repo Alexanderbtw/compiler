@@ -54,16 +54,16 @@ public sealed class Interpreter
     {
         return op switch
         {
-            BinOp.Add => ToLong(l) + ToLong(r),
-            BinOp.Sub => ToLong(l) - ToLong(r),
-            BinOp.Mul => ToLong(l) * ToLong(r),
-            BinOp.Div => ToLong(l) / ToLong(r),
-            BinOp.Mod => ToLong(l) % ToLong(r),
+            BinOp.Add => InterpreterValueOps.ToLong(l) + InterpreterValueOps.ToLong(r),
+            BinOp.Sub => InterpreterValueOps.ToLong(l) - InterpreterValueOps.ToLong(r),
+            BinOp.Mul => InterpreterValueOps.ToLong(l) * InterpreterValueOps.ToLong(r),
+            BinOp.Div => InterpreterValueOps.ToLong(l) / InterpreterValueOps.ToLong(r),
+            BinOp.Mod => InterpreterValueOps.ToLong(l) % InterpreterValueOps.ToLong(r),
 
-            BinOp.Lt => ToLong(l) < ToLong(r),
-            BinOp.Le => ToLong(l) <= ToLong(r),
-            BinOp.Gt => ToLong(l) > ToLong(r),
-            BinOp.Ge => ToLong(l) >= ToLong(r),
+            BinOp.Lt => InterpreterValueOps.ToLong(l) < InterpreterValueOps.ToLong(r),
+            BinOp.Le => InterpreterValueOps.ToLong(l) <= InterpreterValueOps.ToLong(r),
+            BinOp.Gt => InterpreterValueOps.ToLong(l) > InterpreterValueOps.ToLong(r),
+            BinOp.Ge => InterpreterValueOps.ToLong(l) >= InterpreterValueOps.ToLong(r),
 
             BinOp.Eq => Equals(
                 objA: l,
@@ -85,9 +85,9 @@ public sealed class Interpreter
     {
         return op switch
         {
-            UnOp.Neg => -ToLong(r),
-            UnOp.Not => !IsTrue(r),
-            UnOp.Plus => ToLong(r),
+            UnOp.Neg => -InterpreterValueOps.ToLong(r),
+            UnOp.Not => !InterpreterValueOps.IsTrue(r),
+            UnOp.Plus => InterpreterValueOps.ToLong(r),
             _ => throw new RuntimeException($"unknown unary op '{op}'")
         };
     }
@@ -129,31 +129,6 @@ public sealed class Interpreter
             index: index);
     }
 
-    private static bool IsTrue(
-        object? v)
-    {
-        return v switch
-        {
-            bool b => b,
-            long n => n != 0,
-            _ => v != null
-        };
-    }
-
-    private static long ToLong(
-        object? v)
-    {
-        return v switch
-        {
-            long n => n,
-            bool b => b
-                ? 1
-                : 0,
-            null => throw new RuntimeException("null used where integer expected"),
-            _ => throw new RuntimeException($"cannot use {v.GetType().Name} in arithmetic")
-        };
-    }
-
     private object? Call(
         string name,
         object?[] args)
@@ -179,10 +154,13 @@ public sealed class Interpreter
         }
 
         var frame = new Frame();
+        frame.PushScope();
 
         for (var i = 0; i < args.Length; i++)
         {
-            frame.Locals[f.Parameters[i]] = args[i];
+            frame.DefineLocal(
+                name: f.Parameters[i],
+                value: args[i]);
         }
 
         _stack.Push(frame);
@@ -203,6 +181,11 @@ public sealed class Interpreter
         return null;
     }
 
+    private Frame CurrentFrame()
+    {
+        return _stack.Peek();
+    }
+
     private object? Eval(
         ExprHir? e)
     {
@@ -218,8 +201,8 @@ public sealed class Interpreter
                 op: u.Op,
                 r: Eval(u.Operand)),
             BinHir { Op: BinOp.Assign } a => EvalAssign(a),
-            BinHir { Op: BinOp.And } b => IsTrue(Eval(b.Left)) && IsTrue(Eval(b.Right)),
-            BinHir { Op: BinOp.Or } b2 => IsTrue(Eval(b2.Left)) || IsTrue(Eval(b2.Right)),
+            BinHir { Op: BinOp.And } b => InterpreterValueOps.IsTrue(Eval(b.Left)) && InterpreterValueOps.IsTrue(Eval(b.Right)),
+            BinHir { Op: BinOp.Or } b2 => InterpreterValueOps.IsTrue(Eval(b2.Left)) || InterpreterValueOps.IsTrue(Eval(b2.Right)),
             BinHir b3 => ApplyBinary(
                 op: b3.Op,
                 l: Eval(b3.Left),
@@ -233,7 +216,7 @@ public sealed class Interpreter
                     .ToArray()),
             IndexHir ix => ArrayGet(
                 arrObj: Eval(ix.Target),
-                index: (int)ToLong(Eval(ix.Index))),
+                index: (int)InterpreterValueOps.ToLong(Eval(ix.Index))),
             _ => throw new RuntimeException($"expr {e.GetType().Name} not implemented")
         };
     }
@@ -254,7 +237,7 @@ public sealed class Interpreter
             case IndexHir ix:
                 ArraySet(
                     arrObj: Eval(ix.Target),
-                    index: (int)ToLong(Eval(ix.Index)),
+                    index: (int)InterpreterValueOps.ToLong(Eval(ix.Index)),
                     value: value);
 
                 return value;
@@ -266,9 +249,19 @@ public sealed class Interpreter
     private void ExecBlock(
         BlockHir b)
     {
-        foreach (StmtHir s in b.Statements)
+        Frame frame = CurrentFrame();
+        frame.PushScope();
+
+        try
         {
-            ExecStmt(s);
+            foreach (StmtHir s in b.Statements)
+            {
+                ExecStmt(s);
+            }
+        }
+        finally
+        {
+            frame.PopScope();
         }
     }
 
@@ -287,9 +280,10 @@ public sealed class Interpreter
         switch (s)
         {
             case VarDeclHir v:
-                _stack
-                    .Peek()
-                    .Locals[v.Name] = Eval(v.Init);
+                CurrentFrame()
+                    .DefineLocal(
+                        name: v.Name,
+                        value: Eval(v.Init));
 
                 break;
             case ExprStmtHir e:
@@ -302,7 +296,7 @@ public sealed class Interpreter
             case ReturnHir r:
                 throw new ReturnSignal(Eval(r.Expr));
             case IfHir ifs:
-                if (IsTrue(Eval(ifs.Cond)))
+                if (InterpreterValueOps.IsTrue(Eval(ifs.Cond)))
                 {
                     ExecStmt(ifs.Then);
                 }
@@ -313,7 +307,7 @@ public sealed class Interpreter
 
                 break;
             case WhileHir w:
-                while (IsTrue(Eval(w.Cond)))
+                while (InterpreterValueOps.IsTrue(Eval(w.Cond)))
                 {
                     try { ExecStmt(w.Body); }
                     catch (ContinueSignal) { }
@@ -337,38 +331,73 @@ public sealed class Interpreter
     private object? Lookup(
         string name)
     {
-        foreach (Frame frame in _stack)
-        {
-            if (frame.Locals.TryGetValue(
-                    key: name,
-                    value: out object? v))
-            {
-                return v;
-            }
-        }
-
-        throw new RuntimeException($"unbound variable '{name}'");
+        return CurrentFrame()
+            .Lookup(name);
     }
 
     private void SetVar(
         string name,
         object? val)
     {
-        foreach (Frame frame in _stack)
-        {
-            if (frame.Locals.ContainsKey(name))
-            {
-                frame.Locals[name] = val;
-
-                return;
-            }
-        }
-
-        throw new RuntimeException($"unbound variable '{name}'");
+        CurrentFrame()
+            .SetVar(
+                name: name,
+                value: val);
     }
 
     private sealed class Frame
     {
-        public readonly Dictionary<string, object?> Locals = new Dictionary<string, object?>();
+        private readonly Stack<Dictionary<string, object?>> _scopes = new Stack<Dictionary<string, object?>>();
+
+        public void DefineLocal(
+            string name,
+            object? value)
+        {
+            _scopes
+                .Peek()[name] = value;
+        }
+
+        public object? Lookup(
+            string name)
+        {
+            foreach (Dictionary<string, object?> scope in _scopes)
+            {
+                if (scope.TryGetValue(
+                        key: name,
+                        value: out object? value))
+                {
+                    return value;
+                }
+            }
+
+            throw new RuntimeException($"unbound variable '{name}'");
+        }
+
+        public void PopScope()
+        {
+            _scopes.Pop();
+        }
+
+        public void PushScope()
+        {
+            _scopes.Push(new Dictionary<string, object?>());
+        }
+
+        public void SetVar(
+            string name,
+            object? value)
+        {
+            foreach (Dictionary<string, object?> scope in _scopes)
+            {
+                if (scope.ContainsKey(name))
+                {
+                    scope[name] = value;
+
+                    return;
+                }
+            }
+
+            throw new RuntimeException($"unbound variable '{name}'");
+        }
     }
 }

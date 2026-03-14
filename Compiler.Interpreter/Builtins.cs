@@ -120,7 +120,7 @@ public static class Builtins
                     return false;
                 }
 
-                long code = ToLong(args[0]);
+                long code = InterpreterValueOps.ToLong(args[0]);
 
                 if (code < char.MinValue || code > char.MaxValue)
                 {
@@ -134,35 +134,6 @@ public static class Builtins
             default:
                 return false;
         }
-    }
-
-    private static bool IsTrue(
-        object? v)
-    {
-        return v switch
-        {
-            bool b => b,
-            long n => n != 0,
-            char ch => ch != '\0',
-            string s => s.Length != 0,
-            Array arr => arr.Length != 0,
-            null => false,
-            _ => true
-        };
-    }
-
-    private static long ToLong(
-        object? v)
-    {
-        return v switch
-        {
-            long n => n,
-            bool b => b
-                ? 1
-                : 0,
-            null => throw new RuntimeException("null used where integer expected"),
-            _ => throw new RuntimeException($"cannot use {v.GetType().Name} as integer")
-        };
     }
 
     private static bool TryInvokeRuntime(
@@ -192,7 +163,7 @@ public static class Builtins
                     throw new RuntimeException("assert(cond, msg?) requires at least 1 argument");
                 }
 
-                bool cond = IsTrue(args[0]);
+                bool cond = InterpreterValueOps.IsTrue(args[0]);
 
                 if (!cond)
                 {
@@ -209,7 +180,7 @@ public static class Builtins
             case "array":
                 if (args.Length == 1)
                 {
-                    long n = ToLong(args[0]);
+                    long n = InterpreterValueOps.ToLong(args[0]);
 
                     if (n < 0)
                     {
@@ -223,7 +194,7 @@ public static class Builtins
 
                 if (args.Length == 2)
                 {
-                    long n = ToLong(args[0]);
+                    long n = InterpreterValueOps.ToLong(args[0]);
 
                     if (n < 0)
                     {

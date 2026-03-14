@@ -1,5 +1,4 @@
-using Compiler.Backend.JIT.Abstractions.Execution;
-using Compiler.Backend.JIT.CIL;
+using Compiler.Backend.VM;
 using Compiler.Runtime.VM;
 using Compiler.Runtime.VM.Execution.GC;
 using Compiler.Runtime.VM.Options;
@@ -27,10 +26,10 @@ public sealed class GcModesStatsTests(
     {
         var opts = new GcOptions { AutoCollect = auto, InitialThreshold = thr, GrowthFactor = growth };
         var vm = new VirtualMachine(options: opts);
-        var jit = new MirJitCil();
-        ICompiledProgram program = jit.Compile(TestUtils.BuildMir(AllocLoopSrc));
+        var jit = new MirBackendCompiler();
+        VmCompiledProgram program = jit.Compile(TestUtils.BuildMir(AllocLoopSrc));
         program.Execute(
-            runtime: vm,
+            vm: vm,
             entryFunctionName: "main");
 
         GcStats s = vm.GetGcStats();

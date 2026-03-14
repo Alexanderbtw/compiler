@@ -4,7 +4,11 @@ namespace Compiler.Frontend;
 
 public sealed class ErrorListener<TSymbol> : ConsoleErrorListener<TSymbol>
 {
-    public bool HadError;
+    private readonly List<string> _diagnostics = [];
+
+    public IReadOnlyList<string> Diagnostics => _diagnostics;
+
+    public bool HadError => _diagnostics.Count > 0;
 
     public override void SyntaxError(
         TextWriter output,
@@ -15,14 +19,8 @@ public sealed class ErrorListener<TSymbol> : ConsoleErrorListener<TSymbol>
         string msg,
         RecognitionException e)
     {
-        HadError = true;
-        base.SyntaxError(
-            output: output,
-            recognizer: recognizer,
-            offendingSymbol: offendingSymbol,
-            line: line,
-            charPositionInLine: col,
-            msg: msg,
-            e: e);
+        string symbolText = offendingSymbol?.ToString() ?? "<unknown>";
+
+        _diagnostics.Add($"line {line}:{col} {msg} (offending: {symbolText})");
     }
 }

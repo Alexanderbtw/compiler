@@ -4,8 +4,4 @@
     <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="Compiler.Runtime.VM"/>
-  </ItemGroup>
-
 </Project>

@@ -1,8 +1,8 @@
 using Xunit.Abstractions;
 
-namespace Compiler.Tests.CLR;
+namespace Compiler.Tests.Backend;
 
-public sealed class BackendCilFileTests(
+public sealed class BackendVmParityFileTests(
     ITestOutputHelper testOutputHelper)
 {
     [Theory]
@@ -10,7 +10,7 @@ public sealed class BackendCilFileTests(
         name: "Category",
         value: "Tasks")]
     [ProgramFilesData]
-    public void Backend_CIL_Executes_File(
+    public void Backend_VM_Executes_File(
         string path)
     {
         TestUtils.RunAndAssertFile(
@@ -24,7 +24,7 @@ public sealed class BackendCilFileTests(
         name: "Category",
         value: "Tasks")]
     [ProgramFilesData]
-    public void Cil_vs_Interp_All_Files(
+    public void Vm_vs_Interp_All_Files(
         string path)
     {
         string src = File.ReadAllText(path);

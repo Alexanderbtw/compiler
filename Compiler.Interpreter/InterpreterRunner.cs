@@ -1,7 +1,10 @@
 using System.Diagnostics;
 
+using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Metadata;
+using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
+using Compiler.Interpreter.Exceptions;
 using Compiler.Tooling;
 using Compiler.Tooling.Diagnostics;
 using Compiler.Tooling.Options;
@@ -34,42 +37,53 @@ public sealed class InterpreterRunner(
             return Task.FromResult(1);
         }
 
-        ProgramHir hir = pipeline.BuildHir(
-            src: src,
-            verbose: options.Verbose);
+        try
+        {
+            ProgramHir hir = pipeline.BuildHir(
+                src: src,
+                verbose: options.Verbose);
 
-        var interpreter = new Interpreter(hir);
+            var interpreter = new Interpreter(hir);
 
-        using Activity? activity = CompilerInstrumentation.ActivitySource.StartActivity("interpreter.execute");
-        using IDisposable? outputOverride = options.Quiet
-            ? BuiltinsCore.PushWriter(TextWriter.Null)
-            : null;
+            using Activity? activity = CompilerInstrumentation.ActivitySource.StartActivity("interpreter.execute");
+            using IDisposable? outputOverride = options.Quiet
+                ? BuiltinsCore.PushWriter(TextWriter.Null)
+                : null;
 
-        var sw = Stopwatch.StartNew();
-        object? ret = interpreter.Run();
-        sw.Stop();
+            var sw = Stopwatch.StartNew();
+            object? ret = interpreter.Run();
+            sw.Stop();
 
-        CompilerInstrumentation.ExecutionDurationMs.Record(
-            value: sw.Elapsed.TotalMilliseconds,
-            tagList: new TagList
+            CompilerInstrumentation.ExecutionDurationMs.Record(
+                value: sw.Elapsed.TotalMilliseconds,
+                tagList: new TagList
+                {
+                    { "backend", "interpreter" }
+                });
+
+            if (options.Verbose)
             {
-                { "backend", "interpreter" }
-            });
+                logger.LogInformation(
+                    message: "[ret] {ReturnValue}",
+                    ret ?? "null");
+            }
 
-        if (options.Verbose)
-        {
-            logger.LogInformation(
-                message: "[ret] {ReturnValue}",
-                ret ?? "null");
+            if (options.Time)
+            {
+                logger.LogInformation(
+                    message: "[time] {ElapsedMs} ms",
+                    sw.ElapsedMilliseconds);
+            }
+
+            return Task.FromResult(0);
         }
-
-        if (options.Time)
+        catch (Exception ex) when (ex is MiniLangSyntaxException or SemanticException or RuntimeException)
         {
-            logger.LogInformation(
-                message: "[time] {ElapsedMs} ms",
-                sw.ElapsedMilliseconds);
-        }
+            logger.LogError(
+                message: "{Message}",
+                ex.Message);
 
-        return Task.FromResult(0);
+            return Task.FromResult(1);
+        }
     }
 }

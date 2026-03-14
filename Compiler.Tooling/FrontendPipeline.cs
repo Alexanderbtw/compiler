@@ -39,12 +39,29 @@ public sealed class FrontendPipeline(
 
             var listenerLexer = new ErrorListener<int>();
             var listenerParser = new ErrorListener<IToken>();
+            lexer.RemoveErrorListeners();
+            parser.RemoveErrorListeners();
             lexer.AddErrorListener(listenerLexer);
             parser.AddErrorListener(listenerParser);
 
             MiniLangParser.ProgramContext? tree = parser.program();
-            hir = new HirBuilder().Build(tree);
             hadParseError = listenerLexer.HadError || listenerParser.HadError;
+
+            if (hadParseError)
+            {
+                IReadOnlyList<string> diagnostics = listenerLexer
+                    .Diagnostics
+                    .Concat(listenerParser.Diagnostics)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+
+                throw new MiniLangSyntaxException(
+                    string.Join(
+                        separator: Environment.NewLine,
+                        values: diagnostics));
+            }
+
+            hir = new HirBuilder().Build(tree);
         }
 
         parseWatch.Stop();

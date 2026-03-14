@@ -50,6 +50,30 @@ public sealed class BackendParityTests
     }
 
     [Fact]
+    public void BlockShadowing_ParityAcrossBackends()
+    {
+        var src = @"fn main() {
+            var x = 1;
+            {
+                var x = 2;
+                print(x);
+            }
+            print(x);
+        }";
+
+        (object? iRet, string iOut) = TestUtils.RunInterpreter(src);
+        (object? mRet, string mOut) = TestUtils.RunVmMirJit(src);
+
+        Assert.Equal(
+            expected: iRet,
+            actual: mRet);
+
+        Assert.Equal(
+            expected: iOut,
+            actual: mOut);
+    }
+
+    [Fact]
     public void ChrOrd_Roundtrip_ParityAcrossBackends()
     {
         var src = @"fn main() {
@@ -57,6 +81,30 @@ public sealed class BackendParityTests
             assert(c == 'Z');
             print(c);
             return c;
+        }";
+
+        (object? iRet, string iOut) = TestUtils.RunInterpreter(src);
+        (object? mRet, string mOut) = TestUtils.RunVmMirJit(src);
+
+        Assert.Equal(
+            expected: iRet,
+            actual: mRet);
+
+        Assert.Equal(
+            expected: iOut,
+            actual: mOut);
+    }
+
+    [Fact]
+    public void EmptyStringTruthiness_ParityAcrossBackends()
+    {
+        var src = @"fn main() {
+            if ("""") {
+                print(1);
+            }
+            else {
+                print(2);
+            }
         }";
 
         (object? iRet, string iOut) = TestUtils.RunInterpreter(src);

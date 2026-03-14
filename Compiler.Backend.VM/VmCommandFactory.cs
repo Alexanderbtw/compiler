@@ -4,10 +4,10 @@ using Compiler.Tooling.Options;
 
 using Microsoft.Extensions.Options;
 
-namespace Compiler.Backend.JIT.CIL;
+namespace Compiler.Backend.VM;
 
-public sealed class CilCommandFactory(
-    ICilRunner runner,
+public sealed class VmCommandFactory(
+    IVmRunner runner,
     IOptions<RunCommandOptions> defaults,
     IOptions<GcCommandOptions> gcDefaults)
 {
@@ -24,55 +24,51 @@ public sealed class CilCommandFactory(
             name: "--verbose",
             "-v")
         {
-            Description = "Enable verbose compiler diagnostics."
+            Description = "Print MIR and return value."
         };
 
-        var quietOption = new Option<bool>("--quiet")
+        var quietOption = new Option<bool>(
+            name: "--quiet",
+            "-q")
         {
-            Description = "Suppress program stdout from builtins like print."
+            Description = "Suppress builtin output."
         };
 
-        var timeOption = new Option<bool>("--time")
+        var timeOption = new Option<bool>(
+            name: "--time",
+            "-t")
         {
-            Description = "Print total execution time."
+            Description = "Print execution time."
         };
 
-        var thresholdOption = new Option<int>("--vm-gc-threshold")
+        var thresholdOption = new Option<int>(name: "--gc-threshold")
         {
-            Description = "Initial VM heap collection threshold (objects).",
+            Description = "Initial GC collection threshold.",
             DefaultValueFactory = _ => gcDefaults.Value.InitialThreshold
         };
 
-        var growthOption = new Option<double>("--vm-gc-growth")
+        var growthOption = new Option<double>(name: "--gc-growth")
         {
-            Description = "GC threshold growth factor.",
+            Description = "GC growth factor.",
             DefaultValueFactory = _ => gcDefaults.Value.GrowthFactor
         };
 
-        var autoOption = new Option<string>("--vm-gc-auto")
+        var autoOption = new Option<string>(name: "--gc-auto")
         {
-            Description = "Enable or disable opportunistic collections: on|off.",
+            Description = "GC auto mode: on/off.",
             DefaultValueFactory = _ => gcDefaults.Value.AutoCollect
                 ? "on"
                 : "off"
         };
 
-        autoOption.AcceptOnlyFromAmong(
-            "on",
-            "off",
-            "true",
-            "false",
-            "1",
-            "0");
-
-        var statsOption = new Option<bool>("--vm-gc-stats")
+        var statsOption = new Option<bool>(name: "--gc-stats")
         {
-            Description = "Print VM GC statistics after execution."
+            Description = "Print GC stats after execution."
         };
 
         var runCommand = new Command(
             name: "run",
-            description: "Execute MiniLang through the CIL backend.");
+            description: "Execute MiniLang through the register VM backend.");
 
         runCommand.Add(fileOption);
         runCommand.Add(verboseOption);
@@ -90,7 +86,7 @@ public sealed class CilCommandFactory(
             FileInfo? file = parseResult.GetValue(fileOption);
             string autoMode = parseResult.GetValue(autoOption) ?? "on";
 
-            var options = new RunCommandOptions
+            var runOptions = new RunCommandOptions
             {
                 Path = file?.FullName ?? defaults.Value.Path,
                 Verbose = parseResult.GetValue(verboseOption),
@@ -102,32 +98,22 @@ public sealed class CilCommandFactory(
             {
                 InitialThreshold = parseResult.GetValue(thresholdOption),
                 GrowthFactor = parseResult.GetValue(growthOption),
-                AutoCollect = ParseAutoCollect(autoMode),
+                AutoCollect = !string.Equals(
+                    a: autoMode,
+                    b: "off",
+                    comparisonType: StringComparison.OrdinalIgnoreCase),
                 PrintStats = parseResult.GetValue(statsOption)
             };
 
             return await runner.RunAsync(
-                options: options,
+                options: runOptions,
                 gcOptions: gcOptions,
                 cancellationToken: cancellationToken);
         });
 
-        var rootCommand = new RootCommand("MiniLang CIL backend host.");
+        var rootCommand = new RootCommand("MiniLang register VM backend host.");
         rootCommand.Add(runCommand);
 
         return rootCommand;
-    }
-
-    private static bool ParseAutoCollect(
-        string value)
-    {
-        return value.ToLowerInvariant() switch
-        {
-            "off" or "false" or "0" => false,
-            "on" or "true" or "1" => true,
-            _ => throw new ArgumentException(
-                message: "Unsupported value for --vm-gc-auto. Use on|off|true|false|1|0.",
-                paramName: nameof(value))
-        };
     }
 }

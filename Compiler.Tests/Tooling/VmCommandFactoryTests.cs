@@ -1,17 +1,17 @@
-using Compiler.Backend.JIT.CIL;
+using Compiler.Backend.VM;
 using Compiler.Tooling.Options;
 
 using Microsoft.Extensions.Options;
 
 namespace Compiler.Tests.Tooling;
 
-public sealed class CilCommandFactoryTests
+public sealed class VmCommandFactoryTests
 {
     [Fact]
     public async Task Run_Binds_All_Gc_And_Common_Options()
     {
-        var runner = new FakeCilRunner();
-        var factory = new CilCommandFactory(
+        var runner = new FakeVmRunner();
+        var factory = new VmCommandFactory(
             runner: runner,
             defaults: Options.Create(new RunCommandOptions()),
             gcDefaults: Options.Create(new GcCommandOptions()));
@@ -26,13 +26,13 @@ public sealed class CilCommandFactoryTests
                 "--verbose",
                 "--quiet",
                 "--time",
-                "--vm-gc-threshold",
+                "--gc-threshold",
                 "64",
-                "--vm-gc-growth",
+                "--gc-growth",
                 "1.25",
-                "--vm-gc-auto",
+                "--gc-auto",
                 "off",
-                "--vm-gc-stats"
+                "--gc-stats"
             ])
             .InvokeAsync();
 
@@ -73,8 +73,8 @@ public sealed class CilCommandFactoryTests
             GrowthFactor = 2.0
         };
 
-        var runner = new FakeCilRunner();
-        var factory = new CilCommandFactory(
+        var runner = new FakeVmRunner();
+        var factory = new VmCommandFactory(
             runner: runner,
             defaults: Options.Create(defaults),
             gcDefaults: Options.Create(gcDefaults));
@@ -105,7 +105,7 @@ public sealed class CilCommandFactoryTests
         Assert.False(runner.GcOptions.PrintStats);
     }
 
-    private sealed class FakeCilRunner : ICilRunner
+    private sealed class FakeVmRunner : IVmRunner
     {
         public GcCommandOptions? GcOptions { get; private set; }
 

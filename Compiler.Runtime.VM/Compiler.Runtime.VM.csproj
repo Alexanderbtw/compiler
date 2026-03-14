@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\Compiler.Backend.JIT.Abstractions\Compiler.Backend.JIT.Abstractions.csproj"/>
     <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
   </ItemGroup>
 

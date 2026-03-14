@@ -1,7 +1,7 @@
 using BenchmarkDotNet.Attributes;
 
-using Compiler.Backend.JIT.Abstractions.Execution;
-using Compiler.Backend.JIT.CIL;
+using Compiler.Backend.JIT.Abstractions;
+using Compiler.Backend.VM;
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.MIR.Common;
@@ -15,28 +15,31 @@ namespace Compiler.Benchmarks;
 [MemoryDiagnoser]
 public class MiniLangBenchmarks
 {
+    private VmCompiledProgram? factorialProgram;
     private string factorialSource = string.Empty;
     private ILoggerFactory? loggerFactory;
     private IFrontendPipeline? pipeline;
+    private VmCompiledProgram? sieveProgram;
     private string sieveSource = string.Empty;
+    private VmCompiledProgram? sortingProgram;
     private string sortingSource = string.Empty;
 
     [Benchmark]
-    public Value CIL_ArraySorting()
+    public VmCompiledProgram Compile_ArraySorting()
     {
-        return RunCil(sortingSource);
+        return CompileProgram(sortingSource);
     }
 
     [Benchmark]
-    public Value CIL_Factorial()
+    public VmCompiledProgram Compile_Factorial()
     {
-        return RunCil(factorialSource);
+        return CompileProgram(factorialSource);
     }
 
     [Benchmark]
-    public Value CIL_PrimeSieve()
+    public VmCompiledProgram Compile_PrimeSieve()
     {
-        return RunCil(sieveSource);
+        return CompileProgram(sieveSource);
     }
 
     [GlobalCleanup]
@@ -69,6 +72,10 @@ public class MiniLangBenchmarks
             Path.Combine(
                 path1: tasksDirectory,
                 path2: "prime_number_generation.minl"));
+
+        factorialProgram = CompileProgram(factorialSource);
+        sortingProgram = CompileProgram(sortingSource);
+        sieveProgram = CompileProgram(sieveSource);
     }
 
     [Benchmark]
@@ -89,7 +96,25 @@ public class MiniLangBenchmarks
         return RunInterpreter(sieveSource);
     }
 
-    private Value RunCil(
+    [Benchmark]
+    public object? VM_ArraySorting()
+    {
+        return ExecuteCompiledProgram(sortingProgram!);
+    }
+
+    [Benchmark]
+    public object? VM_Factorial()
+    {
+        return ExecuteCompiledProgram(factorialProgram!);
+    }
+
+    [Benchmark]
+    public object? VM_PrimeSieve()
+    {
+        return ExecuteCompiledProgram(sieveProgram!);
+    }
+
+    private VmCompiledProgram CompileProgram(
         string source)
     {
         ProgramHir hir = pipeline!.BuildHir(
@@ -97,16 +122,23 @@ public class MiniLangBenchmarks
             verbose: false);
 
         MirModule mir = pipeline.BuildMir(hir);
+        IBackendCompiler<VmCompiledProgram> compiler = new MirBackendCompiler();
 
+        return compiler.Compile(mir);
+    }
+
+    private object? ExecuteCompiledProgram(
+        VmCompiledProgram program)
+    {
         var vm = new VirtualMachine();
-        var jit = new MirJitCil();
-        ICompiledProgram program = jit.Compile(mir);
 
         using IDisposable outputOverride = BuiltinsCore.PushWriter(TextWriter.Null);
 
-        return program.Execute(
-            runtime: vm,
+        VmValue value = program.Execute(
+            vm: vm,
             entryFunctionName: "main");
+
+        return vm.ExportValue(value);
     }
 
     private object? RunInterpreter(

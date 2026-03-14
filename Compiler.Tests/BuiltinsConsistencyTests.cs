@@ -1,4 +1,3 @@
-using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Runtime.VM;
 using Compiler.Runtime.VM.Execution;
@@ -23,7 +22,8 @@ public sealed class BuiltinsConsistencyTests
                 name: name,
                 minArity: desc.MinArity);
 
-            Value[] vmArgs = BuildVmArgs(
+            VmValue[] vmArgs = BuildVmArgs(
+                vm: vm,
                 name: name,
                 minArity: desc.MinArity);
 
@@ -40,9 +40,9 @@ public sealed class BuiltinsConsistencyTests
             // VM runtime path
             try
             {
-                _ = BuiltinsVm.Invoke(
+                _ = VmBuiltins.Invoke(
                     name: name,
-                    runtime: vm,
+                    vm: vm,
                     args: vmArgs);
             }
             catch (Exception ex)
@@ -75,24 +75,23 @@ public sealed class BuiltinsConsistencyTests
         };
     }
 
-    private static Value[] BuildVmArgs(
+    private static VmValue[] BuildVmArgs(
+        VirtualMachine vm,
         string name,
         int minArity)
     {
-        var vm = new VirtualMachine();
-
         return name switch
         {
-            "print" => [Value.FromLong(0)],
-            "assert" => [Value.FromBool(true)],
-            "array" => [Value.FromLong(0)],
+            "print" => [VmValue.FromLong(0)],
+            "assert" => [VmValue.FromBool(true)],
+            "array" => [VmValue.FromLong(0)],
             "clock_ms" => [],
-            "len" => [Value.FromString(vm.AllocateString("x"))],
-            "ord" => [Value.FromChar('A')],
-            "chr" => [Value.FromLong(65)],
+            "len" => [vm.AllocateString("x")],
+            "ord" => [VmValue.FromChar('A')],
+            "chr" => [VmValue.FromLong(65)],
             _ => Enumerable
                 .Repeat(
-                    element: Value.FromLong(0),
+                    element: VmValue.FromLong(0),
                     count: Math.Max(
                         val1: minArity,
                         val2: 0))

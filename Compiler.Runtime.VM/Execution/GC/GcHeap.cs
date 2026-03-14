@@ -1,27 +1,21 @@
-// uses Value, ValueTag, VmHeapObject, VmArray, VmString
-
-using Compiler.Backend.JIT.Abstractions.Execution;
 using Compiler.Runtime.VM.Execution.Diagnostics;
 
 namespace Compiler.Runtime.VM.Execution.GC;
 
 /// <summary>
-///     A tiny stop-the-world mark–sweep heap for VM-managed objects.
-///     Tracks <see cref="VmArray" /> and <see cref="VmString" /> instances allocated by the VM and
-///     reclaims those that are unreachable from the VM roots (operand stack and locals).
-///     Objects themselves are ordinary managed instances; removing them from the registry
-///     allows the CLR to collect them.
+///     Tiny stop-the-world mark-sweep heap backed by handle-addressed objects.
 /// </summary>
 public sealed class GcHeap(
     int initialThreshold = 1024,
     double growthFactor = 2.0)
 {
-    private readonly HashSet<VmHeapObject> _allocatedObjects = [];
+    private readonly Stack<int> _freeHandles = [];
 
-    // Simple trigger based on number of live objects. Tune or replace with a byte-based threshold if needed.
     private readonly double _growthFactor = Math.Max(
         val1: 1.0,
         val2: growthFactor);
+
+    private readonly List<HeapObject?> _objects = [];
 
     public int Collections { get; private set; }
 
@@ -29,21 +23,17 @@ public sealed class GcHeap(
         val1: 16,
         val2: initialThreshold);
 
-    /// <summary>Total number of arrays currently registered as live.</summary>
-    public int LiveArrayCount => _allocatedObjects.Count(static o => o is VmArray);
+    public int LiveArrayCount => _objects.Count(static objectSlot => objectSlot is ArrayObject);
 
-    /// <summary>Total number of managed objects currently registered as live.</summary>
-    public int LiveObjectCount => _allocatedObjects.Count;
+    public int LiveObjectCount => _objects.Count - _freeHandles.Count;
 
-    /// <summary>Total number of strings currently registered as live.</summary>
-    public int LiveStringCount => _allocatedObjects.Count(static o => o is VmString);
+    public int LiveStringCount => _objects.Count(static objectSlot => objectSlot is StringObject);
 
     public int PeakLive { get; private set; }
 
     public int TotalAllocations { get; private set; }
 
-    /// <summary>Allocate a new VM array and register it with the GC heap.</summary>
-    public VmArray AllocateArray(
+    public int AllocateArray(
         int length)
     {
         if (length < 0)
@@ -53,87 +43,77 @@ public sealed class GcHeap(
                 message: "array length cannot be negative");
         }
 
-        var array = new VmArray(length);
-        _allocatedObjects.Add(array);
-        TotalAllocations++;
+        int handle = AllocateObject(new ArrayObject(length));
         VmRuntimeInstrumentation.ArrayAllocations.Add(1);
 
-        UpdatePeakLive();
-
-        return array;
+        return handle;
     }
 
-    public VmString AllocateString(
+    public int AllocateString(
         string value)
     {
-        var vmString = new VmString(value);
-        _allocatedObjects.Add(vmString);
-        TotalAllocations++;
+        int handle = AllocateObject(new StringObject(value));
         VmRuntimeInstrumentation.StringAllocations.Add(1);
-        UpdatePeakLive();
 
-        return vmString;
+        return handle;
     }
 
-    /// <summary>
-    ///     Perform a full stop-the-world collection.
-    ///     Marks all managed objects reachable from <paramref name="roots" /> and
-    ///     sweeps unreachable objects from the registry.
-    /// </summary>
     public void Collect(
-        IEnumerable<Value> roots)
+        IEnumerable<VmValue> roots)
     {
+        ArgumentNullException.ThrowIfNull(roots);
+
         Collections++;
         VmRuntimeInstrumentation.Collections.Add(1);
 
-        if (roots is null)
-        {
-            throw new ArgumentNullException(nameof(roots));
-        }
+        var markStack = new Stack<int>();
 
-        // MARK
-        var markStack = new Stack<VmHeapObject>();
-
-        // Seed from roots
-        foreach (Value root in roots)
+        foreach (VmValue root in roots)
         {
             MarkValue(
                 value: root,
                 markStack: markStack);
         }
 
-        // Traverse object graph (currently arrays can contain references; strings cannot)
         while (markStack.Count > 0)
         {
-            VmHeapObject current = markStack.Pop();
-            current.VisitReferences(value => MarkValue(
-                value: value,
-                markStack: markStack));
-        }
+            HeapObject heapObject = GetRequiredObject(markStack.Pop());
 
-        // SWEEP
-        var unreachable = new List<VmHeapObject>();
-
-        foreach (VmHeapObject heapObject in _allocatedObjects)
-        {
-            if (!heapObject.GcMarked)
+            if (heapObject is not ArrayObject arrayObject)
             {
-                unreachable.Add(heapObject);
+                continue;
             }
-            else
+
+            foreach (VmValue element in arrayObject.Elements)
             {
-                heapObject.GcMarked = false;
+                MarkValue(
+                    value: element,
+                    markStack: markStack);
             }
         }
 
-        foreach (VmHeapObject dead in unreachable)
+        for (var index = 0; index < _objects.Count; index++)
         {
-            _allocatedObjects.Remove(dead);
+            HeapObject? heapObject = _objects[index];
+
+            if (heapObject is null)
+            {
+                continue;
+            }
+
+            if (!heapObject.Marked)
+            {
+                _objects[index] = null;
+                _freeHandles.Push(index + 1);
+
+                continue;
+            }
+
+            heapObject.Marked = false;
         }
 
         UpdatePeakLive();
 
-        // if still near the threshold after collection, grow it to amortize cost
         if (LiveObjectCount >= CollectionThreshold)
         {
             var grown = (int)Math.Ceiling(CollectionThreshold * _growthFactor);
@@ -141,6 +121,34 @@ public sealed class GcHeap(
                 val1: grown,
                 val2: LiveObjectCount + 1);
         }
+    }
+
+    public VmValue GetArrayElement(
+        int handle,
+        int index)
+    {
+        ArrayObject arrayObject = GetRequiredArray(handle);
+
+        if (index < 0 || index >= arrayObject.Elements.Length)
+        {
+            throw new InvalidOperationException("array index out of bounds");
+        }
+
+        return arrayObject.Elements[index];
+    }
+
+    public int GetArrayLength(
+        int handle)
+    {
+        return GetRequiredArray(handle)
+            .Elements.Length;
+    }
+
+    public HeapObjectKind GetHeapObjectKind(
+        int handle)
+    {
+        return GetRequiredObject(handle)
+            .Kind;
     }
 
     public GcStats GetStats()
@@ -154,39 +162,127 @@ public sealed class GcHeap(
             growthFactor: _growthFactor);
     }
 
-    /// <summary>Returns true if the heap suggests doing a collection after an allocation.</summary>
+    public string GetString(
+        int handle)
+    {
+        return GetRequiredString(handle)
+            .Text;
+    }
+
+    public bool IsAliveHandle(
+        int handle)
+    {
+        if (handle <= 0 || handle > _objects.Count)
+        {
+            return false;
+        }
+
+        return _objects[handle - 1] is not null;
+    }
+
+    public void SetArrayElement(
+        int handle,
+        int index,
+        VmValue value)
+    {
+        ArrayObject arrayObject = GetRequiredArray(handle);
+
+        if (index < 0 || index >= arrayObject.Elements.Length)
+        {
+            throw new InvalidOperationException("array index out of bounds");
+        }
+
+        arrayObject.Elements[index] = value;
+    }
+
     public bool ShouldCollect()
     {
         return LiveObjectCount >= CollectionThreshold;
     }
 
-    private void MarkHeapObject(
-        VmHeapObject heapObject,
-        Stack<VmHeapObject> markStack)
+    internal ArrayObject GetRequiredArray(
+        int handle)
     {
-        if (_allocatedObjects.Contains(heapObject) && !heapObject.GcMarked)
+        HeapObject heapObject = GetRequiredObject(handle);
+
+        if (heapObject is not ArrayObject arrayObject)
         {
-            heapObject.GcMarked = true;
-            markStack.Push(heapObject);
+            throw new InvalidOperationException("heap handle does not reference an array");
         }
+
+        return arrayObject;
+    }
+
+    internal StringObject GetRequiredString(
+        int handle)
+    {
+        HeapObject heapObject = GetRequiredObject(handle);
+
+        if (heapObject is not StringObject stringObject)
+        {
+            throw new InvalidOperationException("heap handle does not reference a string");
+        }
+
+        return stringObject;
+    }
+
+    private int AllocateObject(
+        HeapObject heapObject)
+    {
+        int handle;
+
+        if (_freeHandles.Count > 0)
+        {
+            handle = _freeHandles.Pop();
+            _objects[handle - 1] = heapObject;
+        }
+        else
+        {
+            _objects.Add(heapObject);
+            handle = _objects.Count;
+        }
+
+        TotalAllocations++;
+        UpdatePeakLive();
+
+        return handle;
+    }
+
+    private HeapObject GetRequiredObject(
+        int handle)
+    {
+        if (handle <= 0 || handle > _objects.Count || _objects[handle - 1] is null)
+        {
+            throw new InvalidOperationException($"invalid heap handle '{handle}'");
+        }
+
+        return _objects[handle - 1]!;
+    }
+
+    private void MarkHandle(
+        int handle,
+        Stack<int> markStack)
+    {
+        HeapObject heapObject = GetRequiredObject(handle);
+
+        if (heapObject.Marked)
+        {
+            return;
+        }
+
+        heapObject.Marked = true;
+        markStack.Push(handle);
     }
 
     private void MarkValue(
-        Value value,
-        Stack<VmHeapObject> markStack)
+        VmValue value,
+        Stack<int> markStack)
     {
-        switch (value.Tag)
+        if (value.Kind == VmValueKind.Ref)
         {
-            case ValueTag.Array:
-                MarkHeapObject(
-                    heapObject: value.AsArray(),
-                    markStack: markStack);
-                break;
-            case ValueTag.String:
-                MarkHeapObject(
-                    heapObject: value.AsString(),
-                    markStack: markStack);
-                break;
+            MarkHandle(
+                handle: value.AsHandle(),
+                markStack: markStack);
         }
     }
 

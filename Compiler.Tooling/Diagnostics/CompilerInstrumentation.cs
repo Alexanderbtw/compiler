@@ -6,7 +6,6 @@ namespace Compiler.Tooling.Diagnostics;
 public static class CompilerInstrumentation
 {
     public static readonly ActivitySource ActivitySource = new ActivitySource("Compiler.Tooling");
-
     public static readonly Meter Meter = new Meter("Compiler.Tooling");
     public static readonly Histogram<double> CompileDurationMs = Meter.CreateHistogram<double>(name: "compiler.backend.compile.duration.ms");
 

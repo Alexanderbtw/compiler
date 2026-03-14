@@ -1,9 +1,9 @@
-namespace Compiler.Tests.CLR;
+namespace Compiler.Tests.Backend;
 
-public sealed class ManagedStringCilTests
+public sealed class ManagedStringVmTests
 {
     [Fact]
-    public void StringLiteral_Executes_Through_Managed_Runtime_String()
+    public void StringLiteral_Executes_Through_VM_Runtime_String()
     {
         const string src = """
                            fn main() {

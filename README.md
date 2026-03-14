@@ -4,7 +4,7 @@
 
 MiniLang is an internal compiler/toolchain solution built around a single pipeline:
 ANTLR syntax tree -> HIR -> MIR -> execution hosts. The repository currently ships
-an interpreter, a CIL backend that targets the shared VM runtime contracts, a custom
+an interpreter, a register-VM backend, a custom
 VM runtime with GC, shared tooling/hosting infrastructure, and an isolated
 `Experimental/Typing` area for incomplete type-system work.
 
@@ -16,10 +16,10 @@ VM runtime with GC, shared tooling/hosting infrastructure, and an isolated
   HIR/MIR models, lowering, semantics, builtins metadata, and `Experimental/Typing`.
 - `Compiler.Backend.JIT.Abstractions`
   Backend/runtime execution contracts shared by compiled backends.
-- `Compiler.Backend.JIT.CIL`
-  CIL backend host and JIT implementation.
+- `Compiler.Backend.VM`
+  Register-VM backend host and MIR-to-bytecode compiler.
 - `Compiler.Runtime.VM`
-  VM runtime, values, arrays, GC, and builtin runtime support.
+  VM runtime, values, heap, GC, and builtin runtime support.
 - `Compiler.Interpreter`
   Tree-walking interpreter host.
 - `Compiler.Tooling`
@@ -36,7 +36,8 @@ VM runtime with GC, shared tooling/hosting infrastructure, and an isolated
 - Format: `dotnet format`
 
 Solution-wide SDK settings live in `Directory.Build.props`, package versions in
-`Directory.Packages.props`, and the pinned SDK in `global.json`.
+`Directory.Packages.props`. The repository currently targets `.NET 10`
+(`net10.0`).
 
 ## Run
 
@@ -45,8 +46,8 @@ through `Microsoft.Extensions.Hosting`.
 
 - Interpreter:
   `dotnet run --project Compiler.Interpreter -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
-- CIL backend:
-  `dotnet run --project Compiler.Backend.JIT.CIL -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
+- VM backend:
+  `dotnet run --project Compiler.Backend.VM -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
 
 Common options:
 
@@ -55,12 +56,12 @@ Common options:
 - `--quiet` suppress builtin stdout such as `print`
 - `--time` emit total execution time
 
-VM GC options for the CIL host:
+VM GC options for the VM host:
 
-- `--vm-gc-threshold <N>` initial heap collection threshold
-- `--vm-gc-growth <X>` threshold growth factor
-- `--vm-gc-auto <on|off>` enable or disable opportunistic collections
-- `--vm-gc-stats` print GC statistics after execution
+- `--gc-threshold <N>` initial heap collection threshold
+- `--gc-growth <X>` threshold growth factor
+- `--gc-auto <on|off>` enable or disable opportunistic collections
+- `--gc-stats` print GC statistics after execution
 
 ## Benchmarks
 
@@ -68,7 +69,7 @@ Run the benchmark harness in Release mode:
 
 - `dotnet run --project Compiler.Benchmarks -c Release`
 
-The harness compares interpreter and CIL execution on:
+The harness compares interpreter and VM execution on:
 
 - recursive factorial
 - array sorting
@@ -78,7 +79,11 @@ The harness compares interpreter and CIL execution on:
 
 - `Compiler.Tooling` is intentionally limited to host/orchestration concerns. Core
   language semantics stay in `Compiler.Frontend.Translation`.
-- `Compiler.Backend.JIT.Abstractions` does not depend on the VM implementation;
-  `Compiler.Runtime.VM` is now a concrete runtime.
+- `Compiler.Backend.JIT.Abstractions` contains only the generic MIR-to-backend
+  compile contract. VM execution stays in `Compiler.Backend.VM`.
+- The VM backend is the primary compiled execution target. The interpreter is kept
+  as a separate execution host and parity baseline in tests.
+- The runtime builtin surface currently includes `array`, `print`, `assert`,
+  `len`, `ord`, `chr`, and `clock_ms`.
 - `Experimental/Typing` is a deliberate WIP zone and is not part of the default
   compilation pipeline.

@@ -3,8 +3,8 @@ using System.Text;
 
 using Antlr4.Runtime;
 
-using Compiler.Backend.JIT.Abstractions.Execution;
-using Compiler.Backend.JIT.CIL;
+using Compiler.Backend.JIT.Abstractions;
+using Compiler.Backend.VM;
 using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR;
 using Compiler.Frontend.Translation.HIR.Common;
@@ -235,13 +235,13 @@ internal static class TestUtils
         using var writer = new StringWriter(sb);
         using IDisposable _ = BuiltinsCore.PushWriter(writer);
 
-        var jit = new MirJitCil();
-        ICompiledProgram program = jit.Compile(mir);
-        Value v = program.Execute(
-            runtime: vm,
+        IBackendCompiler<VmCompiledProgram> jit = new MirBackendCompiler();
+        VmCompiledProgram program = jit.Compile(mir);
+        VmValue v = program.Execute(
+            vm: vm,
             entryFunctionName: "main");
 
-        return (TryUnwrapVmValue(v), sb
+        return (vm.ExportValue(v), sb
             .ToString()
             .TrimEnd());
     }
@@ -565,33 +565,8 @@ internal static class TestUtils
         return v switch
         {
             null => null,
-            Value value => value.Tag switch
-            {
-                ValueTag.Null => null,
-                ValueTag.I64 => value.AsInt64(),
-                ValueTag.Bool => value.AsBool(),
-                ValueTag.Char => value.AsChar(),
-                ValueTag.String => value.AsString()
-                    .Text,
-                ValueTag.Array => VmArrayToHostArray(value.AsArray()),
-                ValueTag.Object => value.Ref,
-                _ => throw new ArgumentOutOfRangeException()
-            },
             _ => v
         };
-    }
-
-    private static object?[] VmArrayToHostArray(
-        VmArray arr)
-    {
-        var res = new object?[arr.Length];
-
-        for (var i = 0; i < arr.Length; i++)
-        {
-            res[i] = TryUnwrapVmValue(arr.Data[i]);
-        }
-
-        return res;
     }
 }
 

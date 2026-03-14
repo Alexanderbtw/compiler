@@ -1,7 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <AssemblyName>Compiler.Backend.VM</AssemblyName>
     <OutputType>Exe</OutputType>
+    <RootNamespace>Compiler.Backend.VM</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

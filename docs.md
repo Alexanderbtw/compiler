@@ -2,7 +2,7 @@
 
 MiniLang is a tiny, dynamically typed, C-style language that drives a full pipeline:
 lexer -> parser -> HIR -> MIR -> execution hosts. The solution contains an interpreter,
-a CIL backend that targets shared VM runtime contracts, a custom VM runtime with GC,
+a register-VM backend, a custom VM runtime with GC,
 shared host/tooling infrastructure in `Compiler.Tooling`, and an isolated
 `Experimental/Typing` area for incomplete type-system work. Program files use the
 extension `.minl`.
@@ -14,7 +14,7 @@ extension `.minl`.
   `Compiler.Frontend`,
   `Compiler.Frontend.Translation`,
   `Compiler.Backend.JIT.Abstractions`,
-  `Compiler.Backend.JIT.CIL`,
+  `Compiler.Backend.VM`,
   `Compiler.Runtime.VM`,
   `Compiler.Interpreter`,
   `Compiler.Tooling`,
@@ -22,8 +22,9 @@ extension `.minl`.
   `Compiler.Tests`
 - Shared solution settings:
   `Directory.Build.props`,
-  `Directory.Packages.props`,
-  `global.json`
+  `Directory.Packages.props`
+
+The repository currently targets `.NET 10` (`net10.0`).
 
 ## Build & Test
 
@@ -37,8 +38,8 @@ The executable hosts use `System.CommandLine` and `Microsoft.Extensions.Hosting`
 
 - Interpreter:
   `dotnet run --project Compiler.Interpreter -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
-- CIL JIT (VM semantics):
-  `dotnet run --project Compiler.Backend.JIT.CIL -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
+- VM backend:
+  `dotnet run --project Compiler.Backend.VM -- run --file Compiler.Tests/Tasks/factorial_calculation.minl`
 
 ### Common options
 
@@ -50,16 +51,16 @@ The executable hosts use `System.CommandLine` and `Microsoft.Extensions.Hosting`
 
 ### VM GC options
 
-- `--vm-gc-threshold=N` initial VM heap collection threshold (objects)
-- `--vm-gc-growth=X` threshold growth factor (e.g., 1.5)
-- `--vm-gc-auto=on|off` enable/disable opportunistic collections
-- `--vm-gc-stats` print VM GC statistics after execution
+- `--gc-threshold=N` initial VM heap collection threshold (objects)
+- `--gc-growth=X` threshold growth factor (e.g., 1.5)
+- `--gc-auto=on|off` enable/disable opportunistic collections
+- `--gc-stats` print VM GC statistics after execution
 
-### JITs
+### Backends
 
-- CIL JIT compiles MIR -> IL and executes via the CLR JIT. It implements VM semantics
-  through the shared execution contracts and integrates with the VM GC runtime.
-- Native JIT compiles MIR → x64 machine code (in progress), sharing the same VM runtime contracts.
+- The default backend compiles MIR -> register bytecode and executes it on the VM.
+- The interpreter is a separate execution host used alongside the VM in regression
+  and parity tests.
 
 ## Benchmarks
 
@@ -94,14 +95,14 @@ Example GC stats output
 
 ## 2 · Types & values (run-time)
 
-| Tag      | Literal(s) | Description                                                   |
-|----------|------------|---------------------------------------------------------------|
-| `long`   | `42`       | 64-bit signed integer                                         |
-| `bool`   | `true`     | Logical value                                                 |
-| `char`   | `'x'`      | 16-bit Unicode scalar                                         |
-| `string` | `"foo"`    | Immutable UTF-16 sequence                                     |
-| `array`  | —          | Mutable, zero-indexed `object?[]`, elements default to `null` |
-| `null`   | —          | Absence of a value                                            |
+| Tag      | Literal(s) | Description                                                |
+|----------|------------|------------------------------------------------------------|
+| `long`   | `42`       | 64-bit signed integer                                      |
+| `bool`   | `true`     | Logical value                                              |
+| `char`   | `'x'`      | 16-bit Unicode scalar                                      |
+| `string` | `"foo"`    | Immutable UTF-16 sequence                                  |
+| `array`  | —          | Mutable, zero-indexed VM array, elements default to `null` |
+| `null`   | —          | Absence of a value                                         |
 
 ---
 
@@ -188,6 +189,7 @@ Indices are bounds‑checked; out‑of‑range access raises a runtime error.
 | `ord(c)`             | 1       | Code point of `char` or 1‑length string (returns `long`) |
 | `chr(i)`             | 1       | `char` for integer code point (range‑checked)            |
 | `assert(cond, msg?)` | 1–2     | Throws on false; optional message                        |
+| `clock_ms()`         | 0       | Monotonic timestamp in milliseconds as `long`            |
 
 ---
 

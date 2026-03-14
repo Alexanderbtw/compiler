@@ -1,8 +1,8 @@
 using Compiler.Tooling.Options;
 
-namespace Compiler.Backend.JIT.CIL;
+namespace Compiler.Backend.VM;
 
-public interface ICilRunner
+public interface IVmRunner
 {
     Task<int> RunAsync(
         RunCommandOptions options,
