@@ -13,9 +13,11 @@ public static class CompilerInstrumentation
 
     public static readonly Histogram<double> LoweringDurationMs = Meter.CreateHistogram<double>(name: "compiler.lowering.duration.ms");
 
+    public static readonly Histogram<double> OptimizationDurationMs = Meter.CreateHistogram<double>(name: "compiler.optimization.duration.ms");
+
     public static readonly Histogram<double> ParseDurationMs = Meter.CreateHistogram<double>(name: "compiler.parse.duration.ms");
 
-    public static readonly Histogram<double> SemanticDurationMs = Meter.CreateHistogram<double>(name: "compiler.semantic.duration.ms");
+    public static readonly Histogram<double> PassDurationMs = Meter.CreateHistogram<double>(name: "compiler.optimization.pass.duration.ms");
 
-    public static readonly Histogram<double> SimplificationDurationMs = Meter.CreateHistogram<double>(name: "compiler.simplification.duration.ms");
+    public static readonly Histogram<double> SemanticDurationMs = Meter.CreateHistogram<double>(name: "compiler.semantic.duration.ms");
 }

@@ -10,5 +10,6 @@ public interface IFrontendPipeline
         bool verbose = false);
 
     MirModule BuildMir(
-        ProgramHir hir);
+        ProgramHir hir,
+        MirOptimizationOptions options);
 }

@@ -7,6 +7,8 @@ public sealed class MirModule
 {
     public List<MirFunction> Functions { get; } = [];
 
+    public MirOptimizationReport? OptimizationReport { get; internal set; }
+
     public override string ToString()
     {
         return string.Join(

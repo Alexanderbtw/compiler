@@ -45,6 +45,8 @@ public sealed class MirFunction(
         return new VReg(++_nextTempId);
     }
 
+    internal List<MirBlock> MutableBlocks => _blocks;
+
     public override string ToString()
     {
         return $"func {Name}\n" + string.Join(
