@@ -1,17 +1,19 @@
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
+using Compiler.Frontend.Translation.MIR.Optimization.Analyses;
+using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Passes;
 
-public sealed class TrivialBlockCleanupPass : IMirOptimizationPass
+public sealed class ControlFlowCleanupPass : IMirOptimizationPass
 {
-    public string Name => nameof(TrivialBlockCleanupPass);
+    public string Name => nameof(ControlFlowCleanupPass);
 
     public MirPassResult Run(
         MirFunction function,
         MirAnalysisManager analyses)
     {
-        bool changed = false;
+        var changed = false;
         MirBlock entry = function.Blocks[0];
 
         Dictionary<MirBlock, MirBlock> redirects = BuildRedirects(
@@ -55,9 +57,14 @@ public sealed class TrivialBlockCleanupPass : IMirOptimizationPass
 
                 MirBlock target = branch.Target;
 
-                if (ReferenceEquals(block, target) ||
-                    ReferenceEquals(target, entry) ||
-                    cfg.GetPredecessors(target).Count != 1)
+                if (ReferenceEquals(
+                        objA: block,
+                        objB: target) ||
+                    ReferenceEquals(
+                        objA: target,
+                        objB: entry) ||
+                    cfg.GetPredecessors(target)
+                        .Count != 1)
                 {
                     continue;
                 }
@@ -68,6 +75,7 @@ public sealed class TrivialBlockCleanupPass : IMirOptimizationPass
                     function: function,
                     from: target,
                     to: block);
+
                 function.MutableBlocks.Remove(target);
                 analyses.Invalidate(MirAnalysisKind.All);
                 merged = true;
@@ -75,7 +83,8 @@ public sealed class TrivialBlockCleanupPass : IMirOptimizationPass
 
                 break;
             }
-        } while (merged);
+        }
+        while (merged);
 
         return changed
             ? MirPassResult.ChangedAnalyses(MirAnalysisKind.All)
@@ -90,10 +99,14 @@ public sealed class TrivialBlockCleanupPass : IMirOptimizationPass
 
         foreach (MirBlock block in function.Blocks)
         {
-            if (ReferenceEquals(block, entry) ||
+            if (ReferenceEquals(
+                    objA: block,
+                    objB: entry) ||
                 block.Instructions.Count != 0 ||
                 block.Terminator is not Br branch ||
-                ReferenceEquals(block, branch.Target))
+                ReferenceEquals(
+                    objA: block,
+                    objB: branch.Target))
             {
                 continue;
             }

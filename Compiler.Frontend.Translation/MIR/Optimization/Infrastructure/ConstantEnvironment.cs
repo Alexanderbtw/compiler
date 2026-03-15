@@ -1,6 +1,6 @@
 using Compiler.Frontend.Translation.MIR.Operands;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 public sealed class ConstantEnvironment
 {
@@ -18,6 +18,45 @@ public sealed class ConstantEnvironment
     }
 
     public IReadOnlyDictionary<int, ConstantValueState> Values => _values;
+
+    public static ConstantEnvironment Merge(
+        IEnumerable<ConstantEnvironment> environments)
+    {
+        ConstantEnvironment[] items = environments.ToArray();
+
+        if (items.Length == 0)
+        {
+            return new ConstantEnvironment();
+        }
+
+        var merged = new ConstantEnvironment();
+        HashSet<int> allRegisters = [];
+
+        foreach (ConstantEnvironment environment in items)
+        {
+            allRegisters.UnionWith(environment._values.Keys);
+        }
+
+        foreach (int registerId in allRegisters)
+        {
+            ConstantValueState current = items[0]
+                .Get(registerId);
+
+            for (var i = 1; i < items.Length; i++)
+            {
+                current = Meet(
+                    left: current,
+                    right: items[i]
+                        .Get(registerId));
+            }
+
+            merged.Set(
+                registerId: registerId,
+                state: current);
+        }
+
+        return merged;
+    }
 
     public ConstantEnvironment Clone()
     {
@@ -84,43 +123,6 @@ public sealed class ConstantEnvironment
             state: state);
     }
 
-    public static ConstantEnvironment Merge(
-        IEnumerable<ConstantEnvironment> environments)
-    {
-        ConstantEnvironment[] items = environments.ToArray();
-
-        if (items.Length == 0)
-        {
-            return new ConstantEnvironment();
-        }
-
-        var merged = new ConstantEnvironment();
-        HashSet<int> allRegisters = [];
-
-        foreach (ConstantEnvironment environment in items)
-        {
-            allRegisters.UnionWith(environment._values.Keys);
-        }
-
-        foreach (int registerId in allRegisters)
-        {
-            ConstantValueState current = items[0].Get(registerId);
-
-            for (var i = 1; i < items.Length; i++)
-            {
-                current = Meet(
-                    left: current,
-                    right: items[i].Get(registerId));
-            }
-
-            merged.Set(
-                registerId: registerId,
-                state: current);
-        }
-
-        return merged;
-    }
-
     private static ConstantValueState Meet(
         ConstantValueState left,
         ConstantValueState right)
@@ -141,8 +143,8 @@ public sealed class ConstantEnvironment
         }
 
         return Equals(
-                objA: left.Value,
-                objB: right.Value)
+            objA: left.Value,
+            objB: right.Value)
             ? left
             : ConstantValueState.Overdefined;
     }

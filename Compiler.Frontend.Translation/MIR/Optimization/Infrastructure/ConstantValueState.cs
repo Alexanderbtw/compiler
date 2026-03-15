@@ -1,4 +1,4 @@
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 public enum ConstantValueKind
 {
@@ -11,11 +11,11 @@ public readonly record struct ConstantValueState(
     ConstantValueKind Kind,
     object? Value)
 {
-    public static ConstantValueState Unknown => new(
+    public static ConstantValueState Unknown => new ConstantValueState(
         Kind: ConstantValueKind.Unknown,
         Value: null);
 
-    public static ConstantValueState Overdefined => new(
+    public static ConstantValueState Overdefined => new ConstantValueState(
         Kind: ConstantValueKind.Overdefined,
         Value: null);
 

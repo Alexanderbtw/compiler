@@ -1,8 +1,9 @@
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
+using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Analyses;
 
 public sealed class LivenessAnalysis
 {
@@ -84,7 +85,8 @@ public sealed class LivenessAnalysis
                     changed = true;
                 }
             }
-        } while (changed);
+        }
+        while (changed);
     }
 
     public IReadOnlySet<int> GetLiveOut(

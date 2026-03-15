@@ -1,58 +1,32 @@
+using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Frontend.Translation.MIR.Operands;
-using Compiler.Frontend.Translation.MIR.Operands.Abstractions;
-using Compiler.Frontend.Translation.MIR.Optimization.Analyses;
 using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 namespace Compiler.Frontend.Translation.MIR.Optimization.Passes;
 
-public sealed class GlobalConstantPropagationPass : IMirOptimizationPass
+public sealed class LocalConstantFoldingPass : IMirOptimizationPass
 {
-    public string Name => nameof(GlobalConstantPropagationPass);
+    public string Name => nameof(LocalConstantFoldingPass);
 
     public MirPassResult Run(
         MirFunction function,
         MirAnalysisManager analyses)
     {
-        ReachabilityAnalysis reachability = analyses.GetReachabilityAnalysis();
-        ConstantStateAnalysis constantState = analyses.GetConstantStateAnalysis();
         var changed = false;
 
         foreach (MirBlock block in function.Blocks)
         {
-            if (!reachability.IsReachable(block))
-            {
-                continue;
-            }
-
-            IReadOnlyList<ConstantEnvironment> inputs = constantState.GetInstructionInputs(block);
-
             for (var i = 0; i < block.Instructions.Count; i++)
             {
-                MirInstr original = block.Instructions[i];
-                MirInstr rewritten = RewriteInstruction(
-                    instruction: original,
-                    state: inputs[i]);
+                MirInstr instruction = block.Instructions[i];
+                MirInstr rewritten = FoldInstruction(instruction);
 
-                if (rewritten != original)
+                if (rewritten != instruction)
                 {
                     block.Instructions[i] = rewritten;
-                    changed = true;
-                }
-            }
-
-            if (block.Terminator is not null)
-            {
-                ConstantEnvironment terminatorState = constantState.GetTerminatorInput(block);
-                MirInstr rewrittenTerminator = RewriteInstruction(
-                    instruction: block.Terminator,
-                    state: terminatorState);
-
-                if (rewrittenTerminator != block.Terminator)
-                {
-                    block.Terminator = rewrittenTerminator;
                     changed = true;
                 }
             }
@@ -63,17 +37,10 @@ public sealed class GlobalConstantPropagationPass : IMirOptimizationPass
             : MirPassResult.NoChange;
     }
 
-    private static MirInstr RewriteInstruction(
-        MirInstr instruction,
-        ConstantEnvironment state)
+    private static MirInstr FoldInstruction(
+        MirInstr instruction)
     {
-        MirInstr normalized = MirInstructionUtilities.ReplaceOperands(
-            instruction: instruction,
-            rewriteOperand: operand => RewriteOperand(
-                state: state,
-                operand: operand));
-
-        return normalized switch
+        return instruction switch
         {
             Bin binary when binary.L is Const leftConst &&
                 binary.R is Const rightConst &&
@@ -96,24 +63,8 @@ public sealed class GlobalConstantPropagationPass : IMirOptimizationPass
                 result: out object? folded) => new Move(
                 Dst: call.Dst!,
                 Src: new Const(folded)),
-            _ => normalized
+            _ => instruction
         };
-    }
-
-    private static MOperand RewriteOperand(
-        ConstantEnvironment state,
-        MOperand operand)
-    {
-        if (operand is not VReg register)
-        {
-            return operand;
-        }
-
-        ConstantValueState resolved = state.Get(register);
-
-        return resolved.Kind == ConstantValueKind.Constant
-            ? new Const(resolved.Value)
-            : operand;
     }
 
     private static bool TryFoldCall(
@@ -121,6 +72,15 @@ public sealed class GlobalConstantPropagationPass : IMirOptimizationPass
         out object? result)
     {
         result = null;
+
+        if (!Builtins.Table.TryGetValue(
+                key: call.Callee,
+                value: out List<BuiltinDescriptor>? descriptors) ||
+            !descriptors.Any(descriptor => descriptor.Attributes.HasFlag(BuiltinAttr.Foldable) &&
+                descriptor.Attributes.HasFlag(BuiltinAttr.NoThrow)))
+        {
+            return false;
+        }
 
         if (call.Args.Any(arg => arg is not Const))
         {
@@ -130,7 +90,7 @@ public sealed class GlobalConstantPropagationPass : IMirOptimizationPass
         object?[] args = call
             .Args
             .Cast<Const>()
-            .Select(c => c.Value)
+            .Select(constant => constant.Value)
             .ToArray();
 
         return MirConstantEvaluator.TryEvaluateBuiltinCall(

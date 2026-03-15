@@ -1,6 +1,7 @@
 using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Frontend.Translation.MIR.Optimization.Analyses;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 public sealed class MirAnalysisManager(
     MirFunction function)

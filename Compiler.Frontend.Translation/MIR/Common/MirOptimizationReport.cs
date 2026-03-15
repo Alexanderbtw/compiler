@@ -1,11 +1,11 @@
 namespace Compiler.Frontend.Translation.MIR.Common;
 
 public sealed class MirOptimizationReport(
-    MirOptimizationLevel level)
+    MirOptimizationPasses enabledPasses)
 {
     private readonly List<MirPassExecution> _passes = [];
 
-    public MirOptimizationLevel Level { get; } = level;
+    public MirOptimizationPasses EnabledPasses { get; } = enabledPasses;
 
     public IReadOnlyList<MirPassExecution> Passes => _passes;
 

@@ -1,6 +1,6 @@
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 public static class MirConstantEvaluator
 {
@@ -219,6 +219,6 @@ public static class MirConstantEvaluator
         Type rightType = right.GetType();
 
         return leftType == rightType &&
-               (leftType == typeof(long) || leftType == typeof(bool) || leftType == typeof(char) || leftType == typeof(string));
+            (leftType == typeof(long) || leftType == typeof(bool) || leftType == typeof(char) || leftType == typeof(string));
     }
 }

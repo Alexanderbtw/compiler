@@ -1,7 +1,7 @@
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Analyses;
 
 public sealed class ControlFlowGraph
 {
@@ -14,11 +14,11 @@ public sealed class ControlFlowGraph
         Function = function;
         Entry = function.Blocks[0];
 
-        var predecessors = function.Blocks.ToDictionary(
+        Dictionary<MirBlock, ICollection<MirBlock>> predecessors = function.Blocks.ToDictionary(
             keySelector: block => block,
             elementSelector: _ => (ICollection<MirBlock>)new List<MirBlock>());
 
-        var successors = function.Blocks.ToDictionary(
+        Dictionary<MirBlock, IReadOnlyList<MirBlock>> successors = function.Blocks.ToDictionary(
             keySelector: block => block,
             elementSelector: GetBlockSuccessors);
 
@@ -38,13 +38,14 @@ public sealed class ControlFlowGraph
         _predecessors = predecessors.ToDictionary(
             keySelector: pair => pair.Key,
             elementSelector: pair => (IReadOnlyList<MirBlock>)pair.Value.ToList());
+
         _successors = successors;
         ReachableBlocks = ComputeReachableBlocks();
     }
 
-    public MirFunction Function { get; }
-
     public MirBlock Entry { get; }
+
+    public MirFunction Function { get; }
 
     public IReadOnlySet<MirBlock> ReachableBlocks { get; }
 
@@ -68,6 +69,17 @@ public sealed class ControlFlowGraph
             : Array.Empty<MirBlock>();
     }
 
+    private static IReadOnlyList<MirBlock> GetBlockSuccessors(
+        MirBlock block)
+    {
+        return block.Terminator switch
+        {
+            Br branch => [branch.Target],
+            BrCond branchCondition => [branchCondition.IfTrue, branchCondition.IfFalse],
+            _ => Array.Empty<MirBlock>()
+        };
+    }
+
     private IReadOnlySet<MirBlock> ComputeReachableBlocks()
     {
         HashSet<MirBlock> reachable = [];
@@ -88,16 +100,5 @@ public sealed class ControlFlowGraph
         }
 
         return reachable;
-    }
-
-    private static IReadOnlyList<MirBlock> GetBlockSuccessors(
-        MirBlock block)
-    {
-        return block.Terminator switch
-        {
-            Br branch => [branch.Target],
-            BrCond branchCondition => [branchCondition.IfTrue, branchCondition.IfFalse],
-            _ => Array.Empty<MirBlock>()
-        };
     }
 }

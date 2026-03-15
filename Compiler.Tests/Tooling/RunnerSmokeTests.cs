@@ -82,10 +82,10 @@ public sealed class RunnerSmokeTests
         }
     }
     [Theory]
-    [InlineData(MirOptimizationLevel.O0)]
-    [InlineData(MirOptimizationLevel.O1)]
+    [InlineData(MirOptimizationPasses.None)]
+    [InlineData(MirOptimizationPasses.StableDefault)]
     public async Task VmRunner_Executes_Source_File(
-        MirOptimizationLevel optimizationLevel)
+        MirOptimizationPasses enabledPasses)
     {
         string path = CreateProgramFile();
 
@@ -100,7 +100,7 @@ public sealed class RunnerSmokeTests
                 options: new RunCommandOptions
                 {
                     Path = path,
-                    OptimizationLevel = optimizationLevel,
+                    EnabledOptimizationPasses = enabledPasses,
                     Quiet = true,
                     Time = true,
                     Verbose = true

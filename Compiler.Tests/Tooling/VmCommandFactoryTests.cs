@@ -1,4 +1,5 @@
 using Compiler.Backend.VM;
+using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Tooling.Options;
 
 using Microsoft.Extensions.Options;
@@ -26,6 +27,10 @@ public sealed class VmCommandFactoryTests
                 "--verbose",
                 "--quiet",
                 "--time",
+                "--enable-pass",
+                "local-constant-folding",
+                "--disable-pass",
+                "dead-code-elimination",
                 "--gc-threshold",
                 "64",
                 "--gc-growth",
@@ -49,6 +54,10 @@ public sealed class VmCommandFactoryTests
         Assert.True(runner.Options.Verbose);
         Assert.True(runner.Options.Quiet);
         Assert.True(runner.Options.Time);
+        Assert.Equal(
+            expected: MirOptimizationPasses.StableDefault & ~MirOptimizationPasses.DeadCodeElimination,
+            actual: runner.Options.EnabledOptimizationPasses);
+
         Assert.False(runner.GcOptions!.AutoCollect);
         Assert.Equal(
             expected: 64,
@@ -60,6 +69,60 @@ public sealed class VmCommandFactoryTests
             precision: 3);
 
         Assert.True(runner.GcOptions.PrintStats);
+    }
+
+    [Fact]
+    public async Task Run_Fails_For_Unknown_Pass_Name()
+    {
+        var runner = new FakeVmRunner();
+        var factory = new VmCommandFactory(
+            runner: runner,
+            defaults: Options.Create(new RunCommandOptions()),
+            gcDefaults: Options.Create(new GcCommandOptions()));
+
+        int exitCode = await factory
+            .Create()
+            .Parse(
+            [
+                "run",
+                "--enable-pass",
+                "not-a-pass"
+            ])
+            .InvokeAsync();
+
+        Assert.NotEqual(
+            expected: 0,
+            actual: exitCode);
+
+        Assert.Null(runner.Options);
+    }
+
+    [Fact]
+    public async Task Run_Fails_When_Pass_Is_Both_Enabled_And_Disabled()
+    {
+        var runner = new FakeVmRunner();
+        var factory = new VmCommandFactory(
+            runner: runner,
+            defaults: Options.Create(new RunCommandOptions()),
+            gcDefaults: Options.Create(new GcCommandOptions()));
+
+        int exitCode = await factory
+            .Create()
+            .Parse(
+            [
+                "run",
+                "--enable-pass",
+                "local-constant-folding",
+                "--disable-pass",
+                "local-constant-folding"
+            ])
+            .InvokeAsync();
+
+        Assert.NotEqual(
+            expected: 0,
+            actual: exitCode);
+
+        Assert.Null(runner.Options);
     }
 
     [Fact]
@@ -91,6 +154,10 @@ public sealed class VmCommandFactoryTests
         Assert.Equal(
             expected: "main.minl",
             actual: runner.Options!.Path);
+
+        Assert.Equal(
+            expected: MirOptimizationPasses.StableDefault,
+            actual: runner.Options.EnabledOptimizationPasses);
 
         Assert.True(runner.GcOptions!.AutoCollect);
         Assert.Equal(

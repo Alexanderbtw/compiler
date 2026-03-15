@@ -1,6 +1,6 @@
 using Compiler.Frontend.Translation.MIR.Common;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 public interface IMirOptimizationPass
 {

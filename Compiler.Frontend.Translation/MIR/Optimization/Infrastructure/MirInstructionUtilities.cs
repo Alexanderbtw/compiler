@@ -4,7 +4,7 @@ using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Frontend.Translation.MIR.Operands;
 using Compiler.Frontend.Translation.MIR.Operands.Abstractions;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 public static class MirInstructionUtilities
 {
@@ -33,10 +33,16 @@ public static class MirInstructionUtilities
             Un unary => GetOperandUses(unary.X),
             LoadIndex loadIndex => [.. GetOperandUses(loadIndex.Arr), .. GetOperandUses(loadIndex.Index)],
             StoreIndex storeIndex => [.. GetOperandUses(storeIndex.Arr), .. GetOperandUses(storeIndex.Index), .. GetOperandUses(storeIndex.Value)],
-            Call call => call.Args.SelectMany(GetOperandUses).ToArray(),
+            Call call => call
+                .Args
+                .SelectMany(GetOperandUses)
+                .ToArray(),
             BrCond branchCondition => GetOperandUses(branchCondition.Cond),
             Ret { Value: not null } ret => GetOperandUses(ret.Value!),
-            Phi phi => phi.Incomings.SelectMany(i => GetOperandUses(i.value)).ToArray(),
+            Phi phi => phi
+                .Incomings
+                .SelectMany(i => GetOperandUses(i.value))
+                .ToArray(),
             _ => Array.Empty<int>()
         };
     }
@@ -82,7 +88,10 @@ public static class MirInstructionUtilities
             Call call => new Call(
                 Dst: call.Dst,
                 Callee: call.Callee,
-                Args: call.Args.Select(rewriteOperand).ToArray()),
+                Args: call
+                    .Args
+                    .Select(rewriteOperand)
+                    .ToArray()),
             BrCond branchCondition => new BrCond(
                 Cond: rewriteOperand(branchCondition.Cond),
                 IfTrue: branchCondition.IfTrue,
@@ -93,7 +102,8 @@ public static class MirInstructionUtilities
                     : rewriteOperand(ret.Value)),
             Phi phi => new Phi(
                 Dst: phi.Dst,
-                Incomings: phi.Incomings
+                Incomings: phi
+                    .Incomings
                     .Select(i => (i.block, rewriteOperand(i.value)))
                     .ToArray()),
             _ => instruction
@@ -114,7 +124,8 @@ public static class MirInstructionUtilities
                     continue;
                 }
 
-                IReadOnlyList<(MirBlock block, MOperand value)> incomings = phi.Incomings
+                IReadOnlyList<(MirBlock block, MOperand value)> incomings = phi
+                    .Incomings
                     .Select(incoming => incoming.block == from
                         ? (to, incoming.value)
                         : incoming)
@@ -136,7 +147,9 @@ public static class MirInstructionUtilities
             if (block.Terminator is Br branch)
             {
                 MirBlock target = rewriteTarget(branch.Target);
-                block.Terminator = ReferenceEquals(branch.Target, target)
+                block.Terminator = ReferenceEquals(
+                    objA: branch.Target,
+                    objB: target)
                     ? branch
                     : new Br(target);
             }
@@ -145,8 +158,12 @@ public static class MirInstructionUtilities
                 MirBlock trueTarget = rewriteTarget(branchCondition.IfTrue);
                 MirBlock falseTarget = rewriteTarget(branchCondition.IfFalse);
 
-                if (!ReferenceEquals(branchCondition.IfTrue, trueTarget) ||
-                    !ReferenceEquals(branchCondition.IfFalse, falseTarget))
+                if (!ReferenceEquals(
+                        objA: branchCondition.IfTrue,
+                        objB: trueTarget) ||
+                    !ReferenceEquals(
+                        objA: branchCondition.IfFalse,
+                        objB: falseTarget))
                 {
                     block.Terminator = new BrCond(
                         Cond: branchCondition.Cond,

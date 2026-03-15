@@ -1,6 +1,6 @@
 using Compiler.Frontend.Translation.MIR.Instructions;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Analyses;
 
 public sealed class ReachabilityAnalysis(
     ControlFlowGraph cfg)

@@ -8,7 +8,7 @@ using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Semantic;
 using Compiler.Frontend.Translation.MIR;
 using Compiler.Frontend.Translation.MIR.Common;
-using Compiler.Frontend.Translation.MIR.Optimization;
+using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 using Compiler.Tooling.Diagnostics;
 
 using Microsoft.Extensions.Logging;
@@ -102,7 +102,10 @@ public sealed class FrontendPipeline(
         new MirPassManager().Run(
             module: mir,
             options: options,
-            passObserver: (passName, _, durationMs) =>
+            passObserver: (
+                passName,
+                _,
+                durationMs) =>
             {
                 CompilerInstrumentation.PassDurationMs.Record(
                     value: durationMs,
@@ -111,6 +114,7 @@ public sealed class FrontendPipeline(
                         { "pass", passName }
                     });
             });
+
         optimizeWatch.Stop();
         CompilerInstrumentation.OptimizationDurationMs.Record(optimizeWatch.Elapsed.TotalMilliseconds);
 

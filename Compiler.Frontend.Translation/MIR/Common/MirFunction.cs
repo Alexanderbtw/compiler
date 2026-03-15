@@ -9,7 +9,6 @@ namespace Compiler.Frontend.Translation.MIR.Common;
 public sealed class MirFunction(
     string name)
 {
-    private readonly List<MirBlock> _blocks = [];
     private int _nextTempId;
 
     public enum MType
@@ -20,7 +19,7 @@ public sealed class MirFunction(
         Char = 3
     }
 
-    public IReadOnlyList<MirBlock> Blocks => _blocks;
+    public IReadOnlyList<MirBlock> Blocks => MutableBlocks;
 
     public string Name { get; } = name;
 
@@ -31,11 +30,13 @@ public sealed class MirFunction(
     // Experimental typing annotations; the main pipeline does not rely on them yet.
     public Dictionary<int, MType> Types { get; } = new Dictionary<int, MType>();
 
+    internal List<MirBlock> MutableBlocks { get; } = [];
+
     public MirBlock NewBlock(
         string name)
     {
         var b = new MirBlock(name);
-        _blocks.Add(b);
+        MutableBlocks.Add(b);
 
         return b;
     }
@@ -44,8 +45,6 @@ public sealed class MirFunction(
     {
         return new VReg(++_nextTempId);
     }
-
-    internal List<MirBlock> MutableBlocks => _blocks;
 
     public override string ToString()
     {

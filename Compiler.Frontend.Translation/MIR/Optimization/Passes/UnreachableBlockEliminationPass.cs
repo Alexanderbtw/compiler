@@ -1,7 +1,9 @@
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
+using Compiler.Frontend.Translation.MIR.Optimization.Analyses;
+using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Passes;
 
 public sealed class UnreachableBlockEliminationPass : IMirOptimizationPass
 {
@@ -12,7 +14,8 @@ public sealed class UnreachableBlockEliminationPass : IMirOptimizationPass
         MirAnalysisManager analyses)
     {
         ReachabilityAnalysis reachability = analyses.GetReachabilityAnalysis();
-        List<MirBlock> keptBlocks = function.Blocks
+        List<MirBlock> keptBlocks = function
+            .Blocks
             .Where(reachability.IsReachable)
             .ToList();
 

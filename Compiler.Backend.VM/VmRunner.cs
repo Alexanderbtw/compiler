@@ -6,6 +6,7 @@ using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
 using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 using Compiler.Runtime.VM;
 using Compiler.Runtime.VM.Execution.GC;
 using Compiler.Runtime.VM.Options;
@@ -49,17 +50,24 @@ public sealed class VmRunner(
                 verbose: options.Verbose);
 
             var optimizationOptions = new MirOptimizationOptions(
-                Level: options.OptimizationLevel,
+                EnabledPasses: options.EnabledOptimizationPasses,
                 CollectPassDiagnostics: options.Verbose);
+
             MirModule mir = pipeline.BuildMir(
                 hir: hir,
                 options: optimizationOptions);
 
             if (options.Verbose)
             {
+                string enabledPassSummary = string.Join(
+                    separator: ", ",
+                    values: MirOptimizationPassCatalog.GetEnabledNames(options.EnabledOptimizationPasses));
+
                 logger.LogInformation(
-                    message: "Optimization level: {OptimizationLevel}",
-                    options.OptimizationLevel);
+                    message: "Enabled optimization passes: {EnabledPasses}",
+                    enabledPassSummary.Length == 0
+                        ? "none"
+                        : enabledPassSummary);
 
                 if (optimizationOptions.CollectPassDiagnostics && mir.OptimizationReport is not null)
                 {

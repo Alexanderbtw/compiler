@@ -1,6 +1,7 @@
 using System.CommandLine;
 
 using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 using Compiler.Tooling.Options;
 
 using Microsoft.Extensions.Options;
@@ -42,14 +43,21 @@ public sealed class VmCommandFactory(
             Description = "Print execution time."
         };
 
-        var optimizationOption = new Option<string>(
-            name: "--opt",
-            aliases: ["-O"])
+        var enablePassOption = new Option<string[]>(name: "--enable-pass")
         {
-            Description = "MIR optimization level: o0 or o1.",
-            DefaultValueFactory = _ => "o1"
+            Description = "Enable a specific MIR optimization pass. Can be repeated.",
+            AllowMultipleArgumentsPerToken = true
         };
-        optimizationOption.AcceptOnlyFromAmong("o0", "o1");
+
+        enablePassOption.AcceptOnlyFromAmong(MirOptimizationPassCatalog.Names);
+
+        var disablePassOption = new Option<string[]>(name: "--disable-pass")
+        {
+            Description = "Disable a specific MIR optimization pass. Can be repeated.",
+            AllowMultipleArgumentsPerToken = true
+        };
+
+        disablePassOption.AcceptOnlyFromAmong(MirOptimizationPassCatalog.Names);
 
         var thresholdOption = new Option<int>(name: "--gc-threshold")
         {
@@ -84,7 +92,8 @@ public sealed class VmCommandFactory(
         runCommand.Add(verboseOption);
         runCommand.Add(quietOption);
         runCommand.Add(timeOption);
-        runCommand.Add(optimizationOption);
+        runCommand.Add(enablePassOption);
+        runCommand.Add(disablePassOption);
         runCommand.Add(thresholdOption);
         runCommand.Add(growthOption);
         runCommand.Add(autoOption);
@@ -96,7 +105,23 @@ public sealed class VmCommandFactory(
         {
             FileInfo? file = parseResult.GetValue(fileOption);
             string autoMode = parseResult.GetValue(autoOption) ?? "on";
-            string optimizationMode = parseResult.GetValue(optimizationOption) ?? "o1";
+            string[] enabledPassNames = parseResult.GetValue(enablePassOption) ?? [];
+            string[] disabledPassNames = parseResult.GetValue(disablePassOption) ?? [];
+
+            if (enabledPassNames
+                .Intersect(
+                    second: disabledPassNames,
+                    comparer: StringComparer.OrdinalIgnoreCase)
+                .Any())
+            {
+                Console.Error.WriteLine("A MIR optimization pass cannot be both enabled and disabled.");
+
+                return 1;
+            }
+
+            MirOptimizationPasses enabledPasses = ResolveEnabledPasses(
+                enabledPassNames: enabledPassNames,
+                disabledPassNames: disabledPassNames);
 
             var runOptions = new RunCommandOptions
             {
@@ -104,11 +129,7 @@ public sealed class VmCommandFactory(
                 Verbose = parseResult.GetValue(verboseOption),
                 Quiet = parseResult.GetValue(quietOption),
                 Time = parseResult.GetValue(timeOption),
-                OptimizationLevel = optimizationMode.Equals(
-                    "o0",
-                    StringComparison.OrdinalIgnoreCase)
-                    ? MirOptimizationLevel.O0
-                    : MirOptimizationLevel.O1
+                EnabledOptimizationPasses = enabledPasses
             };
 
             var gcOptions = new GcCommandOptions
@@ -132,5 +153,34 @@ public sealed class VmCommandFactory(
         rootCommand.Add(runCommand);
 
         return rootCommand;
+    }
+
+    private static MirOptimizationPasses ResolveEnabledPasses(
+        IReadOnlyList<string> enabledPassNames,
+        IReadOnlyList<string> disabledPassNames)
+    {
+        var enabledPasses = MirOptimizationPasses.StableDefault;
+
+        foreach (string passName in enabledPassNames)
+        {
+            if (MirOptimizationPassCatalog.TryParse(
+                    name: passName,
+                    pass: out MirOptimizationPasses pass))
+            {
+                enabledPasses |= pass;
+            }
+        }
+
+        foreach (string passName in disabledPassNames)
+        {
+            if (MirOptimizationPassCatalog.TryParse(
+                    name: passName,
+                    pass: out MirOptimizationPasses pass))
+            {
+                enabledPasses &= ~pass;
+            }
+        }
+
+        return enabledPasses;
     }
 }

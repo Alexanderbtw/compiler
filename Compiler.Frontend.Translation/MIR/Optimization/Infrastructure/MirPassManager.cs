@@ -2,28 +2,22 @@ using System.Diagnostics;
 
 using Compiler.Frontend.Translation.MIR.Common;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 public sealed class MirPassManager
 {
-    private readonly IMirOptimizationPass _localCanonicalizationPass = new LocalCanonicalizationPass();
-    private readonly IReadOnlyList<IMirOptimizationPass> _loopPasses =
-    [
-        new GlobalConstantPropagationPass(),
-        new BranchFoldingPass(),
-        new UnreachableBlockEliminationPass(),
-        new DeadCodeEliminationPass(),
-        new TrivialBlockCleanupPass()
-    ];
-
     public MirOptimizationReport Run(
         MirModule module,
         MirOptimizationOptions options,
         Action<string, bool, double>? passObserver = null)
     {
-        var report = new MirOptimizationReport(options.Level);
+        var report = new MirOptimizationReport(options.EnabledPasses);
 
-        if (options.Level == MirOptimizationLevel.O0)
+        IReadOnlyList<MirOptimizationPassRegistration> enabledPasses = MirOptimizationPassCatalog
+            .GetEnabledPassesInOrder(options.EnabledPasses)
+            .ToArray();
+
+        if (enabledPasses.Count == 0)
         {
             module.OptimizationReport = report;
 
@@ -33,22 +27,15 @@ public sealed class MirPassManager
         foreach (MirFunction function in module.Functions)
         {
             var analyses = new MirAnalysisManager(function);
-            ExecutePass(
-                pass: _localCanonicalizationPass,
-                function: function,
-                analyses: analyses,
-                report: report,
-                iteration: 0,
-                passObserver: passObserver);
 
-            for (var iteration = 1; iteration <= 4; iteration++)
+            for (var iteration = 1; iteration <= options.MaxIterations; iteration++)
             {
-                bool changedInIteration = false;
+                var changedInIteration = false;
 
-                foreach (IMirOptimizationPass pass in _loopPasses)
+                foreach (MirOptimizationPassRegistration registration in enabledPasses)
                 {
                     changedInIteration |= ExecutePass(
-                        pass: pass,
+                        registration: registration,
                         function: function,
                         analyses: analyses,
                         report: report,
@@ -69,29 +56,33 @@ public sealed class MirPassManager
     }
 
     private static bool ExecutePass(
-        IMirOptimizationPass pass,
+        MirOptimizationPassRegistration registration,
         MirFunction function,
         MirAnalysisManager analyses,
         MirOptimizationReport report,
         int iteration,
         Action<string, bool, double>? passObserver)
     {
+        IMirOptimizationPass pass = registration.Factory();
         var watch = Stopwatch.StartNew();
         MirPassResult result = pass.Run(
             function: function,
             analyses: analyses);
+
         watch.Stop();
         analyses.Invalidate(result.InvalidatedAnalyses);
 
-        report.AddPass(new MirPassExecution(
-            Name: $"{function.Name}:{pass.Name}",
-            Changed: result.Changed,
-            DurationMs: watch.Elapsed.TotalMilliseconds,
-            Iteration: iteration));
+        report.AddPass(
+            new MirPassExecution(
+                Name: $"{function.Name}:{registration.Name}",
+                Changed: result.Changed,
+                DurationMs: watch.Elapsed.TotalMilliseconds,
+                Iteration: iteration));
+
         passObserver?.Invoke(
-            pass.Name,
-            result.Changed,
-            watch.Elapsed.TotalMilliseconds);
+            arg1: registration.Name,
+            arg2: result.Changed,
+            arg3: watch.Elapsed.TotalMilliseconds);
 
         return result.Changed;
     }

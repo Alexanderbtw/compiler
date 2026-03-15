@@ -123,7 +123,8 @@ public class MiniLangBenchmarks
 
         MirModule mir = pipeline.BuildMir(
             hir: hir,
-            options: new MirOptimizationOptions(MirOptimizationLevel.O1));
+            options: new MirOptimizationOptions());
+
         IBackendCompiler<VmCompiledProgram> compiler = new MirBackendCompiler();
 
         return compiler.Compile(mir);

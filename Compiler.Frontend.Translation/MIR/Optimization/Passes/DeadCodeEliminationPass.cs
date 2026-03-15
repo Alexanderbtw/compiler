@@ -1,8 +1,10 @@
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
+using Compiler.Frontend.Translation.MIR.Optimization.Analyses;
+using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Passes;
 
 public sealed class DeadCodeEliminationPass : IMirOptimizationPass
 {
@@ -14,7 +16,7 @@ public sealed class DeadCodeEliminationPass : IMirOptimizationPass
     {
         ControlFlowGraph cfg = analyses.GetControlFlowGraph();
         LivenessAnalysis liveness = analyses.GetLivenessAnalysis();
-        bool changed = false;
+        var changed = false;
 
         foreach (MirBlock block in function.Blocks)
         {
@@ -32,7 +34,7 @@ public sealed class DeadCodeEliminationPass : IMirOptimizationPass
 
             var rewritten = new List<MirInstr>(block.Instructions.Count);
 
-            for (var i = block.Instructions.Count - 1; i >= 0; i--)
+            for (int i = block.Instructions.Count - 1; i >= 0; i--)
             {
                 MirInstr instruction = block.Instructions[i];
                 IReadOnlyList<int> defs = MirInstructionUtilities.GetDefs(instruction);

@@ -4,7 +4,7 @@ namespace Compiler.Tooling.Options;
 
 public sealed class RunCommandOptions
 {
-    public MirOptimizationLevel OptimizationLevel { get; set; } = MirOptimizationLevel.O1;
+    public MirOptimizationPasses EnabledOptimizationPasses { get; set; } = MirOptimizationPasses.StableDefault;
 
     public string Path { get; set; } = "main.minl";
 

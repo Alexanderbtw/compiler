@@ -1,4 +1,4 @@
-namespace Compiler.Frontend.Translation.MIR.Optimization;
+namespace Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 
 [Flags]
 public enum MirAnalysisKind

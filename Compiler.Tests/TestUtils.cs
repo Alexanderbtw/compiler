@@ -15,7 +15,6 @@ using Compiler.Frontend.Translation.HIR.Semantic;
 using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
 using Compiler.Frontend.Translation.HIR.Statements;
 using Compiler.Frontend.Translation.HIR.Statements.Abstractions;
-using Compiler.Frontend.Translation.MIR;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
@@ -138,19 +137,19 @@ internal static class TestUtils
     {
         return BuildMir(
             src: src,
-            level: MirOptimizationLevel.O1);
+            enabledPasses: MirOptimizationPasses.StableDefault);
     }
 
     public static MirModule BuildMir(
         string src,
-        MirOptimizationLevel level = MirOptimizationLevel.O1)
+        MirOptimizationPasses enabledPasses = MirOptimizationPasses.StableDefault)
     {
         ProgramHir hir = BuildHir(src);
         var pipeline = new FrontendPipeline(NullLogger<FrontendPipeline>.Instance);
 
         return pipeline.BuildMir(
             hir: hir,
-            options: new MirOptimizationOptions(level));
+            options: new MirOptimizationOptions(enabledPasses));
     }
 
     public static IEnumerable<object[]> EnumerateProgramFiles()
@@ -201,7 +200,7 @@ internal static class TestUtils
     {
         MirModule mir = BuildMir(
             src: src,
-            level: MirOptimizationLevel.O0);
+            enabledPasses: MirOptimizationPasses.None);
 
         return mir.Functions.Single(f => f.Name == name);
     }
@@ -247,16 +246,17 @@ internal static class TestUtils
     {
         return RunVmMirJit(
             src: src,
-            level: MirOptimizationLevel.O1);
+            enabledPasses: MirOptimizationPasses.StableDefault);
     }
 
     public static (object? ret, string stdout) RunVmMirJit(
         string src,
-        MirOptimizationLevel level = MirOptimizationLevel.O1)
+        MirOptimizationPasses enabledPasses = MirOptimizationPasses.StableDefault)
     {
         MirModule mir = BuildMir(
             src: src,
-            level: level);
+            enabledPasses: enabledPasses);
+
         var vm = new VirtualMachine();
 
         var sb = new StringBuilder();
