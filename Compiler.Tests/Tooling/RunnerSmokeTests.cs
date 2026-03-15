@@ -1,5 +1,6 @@
 using Compiler.Backend.VM;
 using Compiler.Frontend;
+using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Interpreter;
 using Compiler.Tooling;
 using Compiler.Tooling.Options;
@@ -80,8 +81,11 @@ public sealed class RunnerSmokeTests
             File.Delete(path);
         }
     }
-    [Fact]
-    public async Task VmRunner_Executes_Source_File()
+    [Theory]
+    [InlineData(MirOptimizationLevel.O0)]
+    [InlineData(MirOptimizationLevel.O1)]
+    public async Task VmRunner_Executes_Source_File(
+        MirOptimizationLevel optimizationLevel)
     {
         string path = CreateProgramFile();
 
@@ -96,6 +100,7 @@ public sealed class RunnerSmokeTests
                 options: new RunCommandOptions
                 {
                     Path = path,
+                    OptimizationLevel = optimizationLevel,
                     Quiet = true,
                     Time = true,
                     Verbose = true

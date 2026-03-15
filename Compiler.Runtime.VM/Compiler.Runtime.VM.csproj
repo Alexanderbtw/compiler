@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
+    <ProjectReference Include="..\Compiler.Core\Compiler.Core.csproj"/>
   </ItemGroup>
 
 </Project>

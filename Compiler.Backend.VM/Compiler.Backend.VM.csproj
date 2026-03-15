@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Compiler.Backend.JIT.Abstractions\Compiler.Backend.JIT.Abstractions.csproj"/>
+    <ProjectReference Include="..\Compiler.Core\Compiler.Core.csproj"/>
     <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
     <ProjectReference Include="..\Compiler.Runtime.VM\Compiler.Runtime.VM.csproj"/>
     <ProjectReference Include="..\Compiler.Tooling\Compiler.Tooling.csproj"/>

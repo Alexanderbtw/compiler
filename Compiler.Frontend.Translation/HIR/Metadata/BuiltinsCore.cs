@@ -1,40 +1,28 @@
 namespace Compiler.Frontend.Translation.HIR.Metadata;
 
 /// <summary>
-///     Shared sink for runtime printing.
-///     Supports scoped writer overrides so tests and hosts do not need to mutate Console.Out.
+///     Compatibility facade over the shared builtin output sink.
 /// </summary>
 public static class BuiltinsCore
 {
-    private static readonly AsyncLocal<TextWriter?> CurrentWriter = new AsyncLocal<TextWriter?>();
-
+    /// <summary>
+    ///     Writes one formatted builtin output line.
+    /// </summary>
+    /// <param name="tokens">Rendered tokens.</param>
     public static void PrintLine(
         IEnumerable<string> tokens)
     {
-        TextWriter writer = CurrentWriter.Value ?? Console.Out;
-        writer.WriteLine(
-            string.Join(
-                separator: " ",
-                values: tokens));
+        Compiler.Core.Builtins.BuiltinsCore.PrintLine(tokens);
     }
 
+    /// <summary>
+    ///     Overrides the builtin output writer for the current async flow.
+    /// </summary>
+    /// <param name="writer">Writer to use.</param>
+    /// <returns>Scope that restores the previous writer.</returns>
     public static IDisposable PushWriter(
         TextWriter writer)
     {
-        ArgumentNullException.ThrowIfNull(writer);
-
-        TextWriter? previous = CurrentWriter.Value;
-        CurrentWriter.Value = writer;
-
-        return new WriterScope(previous);
-    }
-
-    private sealed class WriterScope(
-        TextWriter? previous) : IDisposable
-    {
-        public void Dispose()
-        {
-            CurrentWriter.Value = previous;
-        }
+        return Compiler.Core.Builtins.BuiltinsCore.PushWriter(writer);
     }
 }

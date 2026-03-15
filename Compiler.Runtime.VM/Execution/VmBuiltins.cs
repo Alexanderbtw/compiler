@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-using Compiler.Frontend.Translation.HIR.Metadata;
+using Compiler.Core.Builtins;
 
 namespace Compiler.Runtime.VM.Execution;
 
@@ -11,10 +11,23 @@ public static class VmBuiltins
 {
     public static VmValue Invoke(
         string name,
-        VirtualMachine vm,
+        IVmExecutionRuntime vm,
+        VmValue[] args)
+    {
+        ArgumentNullException.ThrowIfNull(args);
+
+        return Invoke(
+            name: name,
+            vm: vm,
+            args: (ReadOnlySpan<VmValue>)args);
+    }
+
+    public static VmValue Invoke(
+        string name,
+        IVmExecutionRuntime vm,
         ReadOnlySpan<VmValue> args)
     {
-        IReadOnlyList<BuiltinDescriptor> candidates = Builtins.GetCandidates(name);
+        IReadOnlyList<BuiltinSignature> candidates = BuiltinCatalog.GetCandidates(name);
 
         if (candidates.Count == 0)
         {
@@ -23,7 +36,7 @@ public static class VmBuiltins
 
         var arityOk = false;
 
-        foreach (BuiltinDescriptor descriptor in candidates)
+        foreach (BuiltinSignature descriptor in candidates)
         {
             bool matches = descriptor.Attributes.HasFlag(BuiltinAttr.VarArgs)
                 ? args.Length >= descriptor.MinArity
@@ -68,7 +81,7 @@ public static class VmBuiltins
     }
 
     private static VmValue Array(
-        VirtualMachine vm,
+        IVmExecutionRuntime vm,
         ReadOnlySpan<VmValue> args)
     {
         if (args.Length is not (1 or 2))
@@ -102,7 +115,7 @@ public static class VmBuiltins
     }
 
     private static VmValue Assert(
-        VirtualMachine vm,
+        IVmExecutionRuntime vm,
         ReadOnlySpan<VmValue> args)
     {
         if (args.Length < 1)
@@ -153,7 +166,7 @@ public static class VmBuiltins
     }
 
     private static VmValue Len(
-        VirtualMachine vm,
+        IVmExecutionRuntime vm,
         ReadOnlySpan<VmValue> args)
     {
         if (args.Length != 1)
@@ -167,7 +180,7 @@ public static class VmBuiltins
     }
 
     private static VmValue Ord(
-        VirtualMachine vm,
+        IVmExecutionRuntime vm,
         ReadOnlySpan<VmValue> args)
     {
         if (args.Length != 1)
@@ -203,7 +216,7 @@ public static class VmBuiltins
     }
 
     private static VmValue Print(
-        VirtualMachine vm,
+        IVmExecutionRuntime vm,
         ReadOnlySpan<VmValue> args)
     {
         BuiltinsCore.PrintLine(

@@ -5,21 +5,23 @@ using Antlr4.Runtime;
 
 using Compiler.Backend.JIT.Abstractions;
 using Compiler.Backend.VM;
+using Compiler.Core.Builtins;
 using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR;
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Expressions;
 using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
-using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.HIR.Semantic;
 using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
 using Compiler.Frontend.Translation.HIR.Statements;
 using Compiler.Frontend.Translation.HIR.Statements.Abstractions;
-using Compiler.Frontend.Translation.MIR;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
 using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
 using Compiler.Runtime.VM;
+using Compiler.Tooling;
+
+using Microsoft.Extensions.Logging.Abstractions;
 
 using Xunit.Abstractions;
 using Xunit.Sdk;
@@ -133,9 +135,21 @@ internal static class TestUtils
     public static MirModule BuildMir(
         string src)
     {
-        ProgramHir hir = BuildHir(src);
+        return BuildMir(
+            src: src,
+            level: MirOptimizationLevel.O1);
+    }
 
-        return new HirToMir().Lower(hir);
+    public static MirModule BuildMir(
+        string src,
+        MirOptimizationLevel level = MirOptimizationLevel.O1)
+    {
+        ProgramHir hir = BuildHir(src);
+        var pipeline = new FrontendPipeline(NullLogger<FrontendPipeline>.Instance);
+
+        return pipeline.BuildMir(
+            hir: hir,
+            options: new MirOptimizationOptions(level));
     }
 
     public static IEnumerable<object[]> EnumerateProgramFiles()
@@ -184,7 +198,9 @@ internal static class TestUtils
         string src,
         string name = "main")
     {
-        MirModule mir = BuildMir(src);
+        MirModule mir = BuildMir(
+            src: src,
+            level: MirOptimizationLevel.O0);
 
         return mir.Functions.Single(f => f.Name == name);
     }
@@ -228,7 +244,19 @@ internal static class TestUtils
     public static (object? ret, string stdout) RunVmMirJit(
         string src)
     {
-        MirModule mir = BuildMir(src);
+        return RunVmMirJit(
+            src: src,
+            level: MirOptimizationLevel.O1);
+    }
+
+    public static (object? ret, string stdout) RunVmMirJit(
+        string src,
+        MirOptimizationLevel level = MirOptimizationLevel.O1)
+    {
+        MirModule mir = BuildMir(
+            src: src,
+            level: level);
+
         var vm = new VirtualMachine();
 
         var sb = new StringBuilder();

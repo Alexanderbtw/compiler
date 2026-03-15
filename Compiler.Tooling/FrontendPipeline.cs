@@ -8,6 +8,8 @@ using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Semantic;
 using Compiler.Frontend.Translation.MIR;
 using Compiler.Frontend.Translation.MIR.Common;
+using Compiler.Frontend.Translation.MIR.Optimization;
+using Compiler.Frontend.Translation.MIR.Optimization.Infrastructure;
 using Compiler.Tooling.Diagnostics;
 
 using Microsoft.Extensions.Logging;
@@ -88,7 +90,8 @@ public sealed class FrontendPipeline(
     }
 
     public MirModule BuildMir(
-        ProgramHir hir)
+        ProgramHir hir,
+        MirOptimizationOptions options)
     {
         using Activity? activity = CompilerInstrumentation.ActivitySource.StartActivity("frontend.build-mir");
         var loweringWatch = Stopwatch.StartNew();
@@ -96,10 +99,25 @@ public sealed class FrontendPipeline(
         loweringWatch.Stop();
         CompilerInstrumentation.LoweringDurationMs.Record(loweringWatch.Elapsed.TotalMilliseconds);
 
-        var simplifyWatch = Stopwatch.StartNew();
-        new MirSimplifier().Run(mir);
-        simplifyWatch.Stop();
-        CompilerInstrumentation.SimplificationDurationMs.Record(simplifyWatch.Elapsed.TotalMilliseconds);
+        var optimizeWatch = Stopwatch.StartNew();
+        new MirPassManager().Run(
+            module: mir,
+            options: options,
+            passObserver: (
+                passName,
+                _,
+                durationMs) =>
+            {
+                CompilerInstrumentation.PassDurationMs.Record(
+                    value: durationMs,
+                    tagList: new TagList
+                    {
+                        { "pass", passName }
+                    });
+            });
+
+        optimizeWatch.Stop();
+        CompilerInstrumentation.OptimizationDurationMs.Record(optimizeWatch.Elapsed.TotalMilliseconds);
 
         // Experimental type annotator intentionally stays out of the default pipeline.
         // See Compiler.Frontend.Translation/Experimental/Typing.

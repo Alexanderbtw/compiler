@@ -1,5 +1,6 @@
 using System.CommandLine;
 
+using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Tooling.Options;
 
 using Microsoft.Extensions.Options;
@@ -41,6 +42,18 @@ public sealed class VmCommandFactory(
             Description = "Print execution time."
         };
 
+        var optimizationOption = new Option<string>(
+            name: "--opt",
+            aliases: ["-O"])
+        {
+            Description = "MIR optimization level: o0 or o1.",
+            DefaultValueFactory = _ => "o1"
+        };
+
+        optimizationOption.AcceptOnlyFromAmong(
+            "o0",
+            "o1");
+
         var thresholdOption = new Option<int>(name: "--gc-threshold")
         {
             Description = "Initial GC collection threshold.",
@@ -74,6 +87,7 @@ public sealed class VmCommandFactory(
         runCommand.Add(verboseOption);
         runCommand.Add(quietOption);
         runCommand.Add(timeOption);
+        runCommand.Add(optimizationOption);
         runCommand.Add(thresholdOption);
         runCommand.Add(growthOption);
         runCommand.Add(autoOption);
@@ -85,13 +99,19 @@ public sealed class VmCommandFactory(
         {
             FileInfo? file = parseResult.GetValue(fileOption);
             string autoMode = parseResult.GetValue(autoOption) ?? "on";
+            string optimizationMode = parseResult.GetValue(optimizationOption) ?? "o1";
 
             var runOptions = new RunCommandOptions
             {
                 Path = file?.FullName ?? defaults.Value.Path,
                 Verbose = parseResult.GetValue(verboseOption),
                 Quiet = parseResult.GetValue(quietOption),
-                Time = parseResult.GetValue(timeOption)
+                Time = parseResult.GetValue(timeOption),
+                OptimizationLevel = optimizationMode.Equals(
+                    value: "o0",
+                    comparisonType: StringComparison.OrdinalIgnoreCase)
+                    ? MirOptimizationLevel.O0
+                    : MirOptimizationLevel.O1
             };
 
             var gcOptions = new GcCommandOptions

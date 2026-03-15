@@ -1,9 +1,9 @@
 using System.Diagnostics;
 
 using Compiler.Backend.JIT.Abstractions;
+using Compiler.Core.Builtins;
 using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR.Common;
-using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Runtime.VM;
@@ -48,10 +48,34 @@ public sealed class VmRunner(
                 src: source,
                 verbose: options.Verbose);
 
-            MirModule mir = pipeline.BuildMir(hir);
+            var optimizationOptions = new MirOptimizationOptions(
+                Level: options.OptimizationLevel,
+                CollectPassDiagnostics: options.Verbose);
+
+            MirModule mir = pipeline.BuildMir(
+                hir: hir,
+                options: optimizationOptions);
 
             if (options.Verbose)
             {
+                logger.LogInformation(
+                    message: "Optimization level: {OptimizationLevel}",
+                    options.OptimizationLevel);
+
+                if (optimizationOptions.CollectPassDiagnostics && mir.OptimizationReport is not null)
+                {
+                    string summary = string.Join(
+                        separator: ", ",
+                        values: mir.OptimizationReport.Passes.Select(pass =>
+                            $"{pass.Name}@{pass.Iteration}:{(pass.Changed ? "changed" : "stable")}"));
+
+                    logger.LogInformation(
+                        message: "Optimization passes: {Summary}",
+                        summary.Length == 0
+                            ? "none"
+                            : summary);
+                }
+
                 logger.LogInformation(
                     message: "MIR:{NewLine}{Mir}",
                     Environment.NewLine,
