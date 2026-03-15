@@ -1,4 +1,4 @@
-using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
+using Compiler.Core.Operations;
 
 namespace Compiler.Runtime.VM.Bytecode;
 

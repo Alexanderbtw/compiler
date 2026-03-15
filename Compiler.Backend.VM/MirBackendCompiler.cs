@@ -1,3 +1,4 @@
+using Compiler.Core.Operations;
 using Compiler.Backend.JIT.Abstractions;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Frontend.Translation.MIR.Instructions;
@@ -87,7 +88,7 @@ public sealed class MirBackendCompiler : IBackendCompiler<VmCompiledProgram>
                     constantMap: constantMap)),
             Bin binary => new VmBinaryInstruction(
                 DestinationRegister: binary.Dst.Id,
-                Operation: binary.Op,
+                Operation: MapBinaryOperation(binary.Op),
                 Left: CompileOperand(
                     operand: binary.L,
                     constants: constants,
@@ -98,7 +99,7 @@ public sealed class MirBackendCompiler : IBackendCompiler<VmCompiledProgram>
                     constantMap: constantMap)),
             Un unary => new VmUnaryInstruction(
                 DestinationRegister: unary.Dst.Id,
-                Operation: unary.Op,
+                Operation: MapUnaryOperation(unary.Op),
                 Operand: CompileOperand(
                     operand: unary.X,
                     constants: constants,
@@ -325,6 +326,38 @@ public sealed class MirBackendCompiler : IBackendCompiler<VmCompiledProgram>
         }
 
         return maxRegisterId;
+    }
+
+    private static Compiler.Core.Operations.MBinOp MapBinaryOperation(
+        Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp operation)
+    {
+        return operation switch
+        {
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Add => Compiler.Core.Operations.MBinOp.Add,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Sub => Compiler.Core.Operations.MBinOp.Sub,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Mul => Compiler.Core.Operations.MBinOp.Mul,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Div => Compiler.Core.Operations.MBinOp.Div,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Mod => Compiler.Core.Operations.MBinOp.Mod,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Lt => Compiler.Core.Operations.MBinOp.Lt,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Le => Compiler.Core.Operations.MBinOp.Le,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Gt => Compiler.Core.Operations.MBinOp.Gt,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Ge => Compiler.Core.Operations.MBinOp.Ge,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Eq => Compiler.Core.Operations.MBinOp.Eq,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MBinOp.Ne => Compiler.Core.Operations.MBinOp.Ne,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+    }
+
+    private static Compiler.Core.Operations.MUnOp MapUnaryOperation(
+        Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MUnOp operation)
+    {
+        return operation switch
+        {
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MUnOp.Neg => Compiler.Core.Operations.MUnOp.Neg,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MUnOp.Not => Compiler.Core.Operations.MUnOp.Not,
+            Compiler.Frontend.Translation.MIR.Instructions.Abstractions.MUnOp.Plus => Compiler.Core.Operations.MUnOp.Plus,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
     }
 
     private static int GetOrAddConstant(

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Compiler.Backend.VM\Compiler.Backend.VM.csproj"/>
+    <ProjectReference Include="..\Compiler.Core\Compiler.Core.csproj"/>
+    <ProjectReference Include="..\Compiler.Frontend.Translation\Compiler.Frontend.Translation.csproj"/>
+    <ProjectReference Include="..\Compiler.Runtime.VM\Compiler.Runtime.VM.csproj"/>
+  </ItemGroup>
+</Project>

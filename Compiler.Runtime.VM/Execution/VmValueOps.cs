@@ -8,7 +8,7 @@ public static class VmValueOps
     public static bool AreEqual(
         VmValue left,
         VmValue right,
-        VirtualMachine vm)
+        IVmExecutionRuntime vm)
     {
         if (left.Kind != right.Kind)
         {
@@ -36,7 +36,7 @@ public static class VmValueOps
 
     public static VmValue Len(
         VmValue value,
-        VirtualMachine vm)
+        IVmExecutionRuntime vm)
     {
         return vm.GetHeapObjectKind(value.AsHandle()) switch
         {
@@ -50,7 +50,7 @@ public static class VmValueOps
 
     public static bool ToBool(
         VmValue value,
-        VirtualMachine vm)
+        IVmExecutionRuntime vm)
     {
         return value.Kind switch
         {
@@ -71,7 +71,7 @@ public static class VmValueOps
     private static bool AreReferencesEqual(
         int leftHandle,
         int rightHandle,
-        VirtualMachine vm)
+        IVmExecutionRuntime vm)
     {
         HeapObjectKind leftKind = vm.GetHeapObjectKind(leftHandle);
         HeapObjectKind rightKind = vm.GetHeapObjectKind(rightHandle);

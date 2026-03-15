@@ -43,6 +43,20 @@ public sealed class VmCommandFactory(
             Description = "Print execution time."
         };
 
+        var optimizationOption = new Option<string>(
+            name: "--opt",
+            aliases: ["-O"])
+        {
+            Description = "MIR optimization level: o0 or o1.",
+            DefaultValueFactory = _ => defaults.Value.OptimizationLevel == MirOptimizationLevel.O0
+                ? "o0"
+                : "o1"
+        };
+
+        optimizationOption.AcceptOnlyFromAmong(
+            "o0",
+            "o1");
+
         var enablePassOption = new Option<string[]>(name: "--enable-pass")
         {
             Description = "Enable a specific MIR optimization pass. Can be repeated.",
@@ -92,6 +106,7 @@ public sealed class VmCommandFactory(
         runCommand.Add(verboseOption);
         runCommand.Add(quietOption);
         runCommand.Add(timeOption);
+        runCommand.Add(optimizationOption);
         runCommand.Add(enablePassOption);
         runCommand.Add(disablePassOption);
         runCommand.Add(thresholdOption);
@@ -105,6 +120,7 @@ public sealed class VmCommandFactory(
         {
             FileInfo? file = parseResult.GetValue(fileOption);
             string autoMode = parseResult.GetValue(autoOption) ?? "on";
+            string optimizationMode = parseResult.GetValue(optimizationOption) ?? "o1";
             string[] enabledPassNames = parseResult.GetValue(enablePassOption) ?? [];
             string[] disabledPassNames = parseResult.GetValue(disablePassOption) ?? [];
 
@@ -119,7 +135,16 @@ public sealed class VmCommandFactory(
                 return 1;
             }
 
+            MirOptimizationLevel optimizationLevel = optimizationMode.Equals(
+                value: "o0",
+                comparisonType: StringComparison.OrdinalIgnoreCase)
+                ? MirOptimizationLevel.O0
+                : MirOptimizationLevel.O1;
+
             MirOptimizationPasses enabledPasses = ResolveEnabledPasses(
+                basePasses: optimizationLevel == MirOptimizationLevel.O0
+                    ? MirOptimizationPasses.None
+                    : MirOptimizationPasses.StableDefault,
                 enabledPassNames: enabledPassNames,
                 disabledPassNames: disabledPassNames);
 
@@ -129,6 +154,7 @@ public sealed class VmCommandFactory(
                 Verbose = parseResult.GetValue(verboseOption),
                 Quiet = parseResult.GetValue(quietOption),
                 Time = parseResult.GetValue(timeOption),
+                OptimizationLevel = optimizationLevel,
                 EnabledOptimizationPasses = enabledPasses
             };
 
@@ -156,10 +182,11 @@ public sealed class VmCommandFactory(
     }
 
     private static MirOptimizationPasses ResolveEnabledPasses(
+        MirOptimizationPasses basePasses,
         IReadOnlyList<string> enabledPassNames,
         IReadOnlyList<string> disabledPassNames)
     {
-        var enabledPasses = MirOptimizationPasses.StableDefault;
+        MirOptimizationPasses enabledPasses = basePasses;
 
         foreach (string passName in enabledPassNames)
         {

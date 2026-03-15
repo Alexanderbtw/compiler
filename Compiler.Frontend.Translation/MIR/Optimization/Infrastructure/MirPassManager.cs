@@ -11,7 +11,7 @@ public sealed class MirPassManager
         MirOptimizationOptions options,
         Action<string, bool, double>? passObserver = null)
     {
-        var report = new MirOptimizationReport(options.EnabledPasses);
+        var report = new MirOptimizationReport(options);
 
         IReadOnlyList<MirOptimizationPassRegistration> enabledPasses = MirOptimizationPassCatalog
             .GetEnabledPassesInOrder(options.EnabledPasses)

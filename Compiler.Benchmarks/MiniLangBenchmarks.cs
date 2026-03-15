@@ -2,8 +2,8 @@ using BenchmarkDotNet.Attributes;
 
 using Compiler.Backend.JIT.Abstractions;
 using Compiler.Backend.VM;
+using Compiler.Core.Builtins;
 using Compiler.Frontend.Translation.HIR.Common;
-using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.MIR.Common;
 using Compiler.Runtime.VM;
 using Compiler.Tooling;
@@ -123,7 +123,7 @@ public class MiniLangBenchmarks
 
         MirModule mir = pipeline.BuildMir(
             hir: hir,
-            options: new MirOptimizationOptions());
+            options: new MirOptimizationOptions(MirOptimizationLevel.O1));
 
         IBackendCompiler<VmCompiledProgram> compiler = new MirBackendCompiler();
 

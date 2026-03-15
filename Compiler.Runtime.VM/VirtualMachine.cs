@@ -1,5 +1,5 @@
-using Compiler.Frontend.Translation.HIR.Metadata;
-using Compiler.Frontend.Translation.MIR.Instructions.Abstractions;
+using Compiler.Core.Builtins;
+using Compiler.Core.Operations;
 using Compiler.Runtime.VM.Bytecode;
 using Compiler.Runtime.VM.Execution;
 using Compiler.Runtime.VM.Execution.GC;
@@ -10,9 +10,10 @@ namespace Compiler.Runtime.VM;
 /// <summary>
 ///     Register-based virtual machine with a handle-addressed heap and mark-sweep GC.
 /// </summary>
-public sealed class VirtualMachine
+public sealed class VirtualMachine : IVmExecutionRuntime
 {
     private readonly List<VmValue[]> _constantRoots = [];
+    private readonly List<CompiledFrameRoots> _compiledFrameRoots = [];
     private readonly List<CallFrame> _frames = [];
     private readonly GcHeap _gcHeap;
     private readonly GcOptions _options;
@@ -48,6 +49,24 @@ public sealed class VirtualMachine
         VmProgram program,
         string entryFunctionName)
     {
+        return Execute(
+            program: program,
+            entryFunctionName: entryFunctionName,
+            observer: null);
+    }
+
+    /// <summary>
+    ///     Executes a bytecode program with optional execution observation and tier switching.
+    /// </summary>
+    /// <param name="program">Program to execute.</param>
+    /// <param name="entryFunctionName">Entry function name.</param>
+    /// <param name="observer">Optional execution observer.</param>
+    /// <returns>Program result.</returns>
+    public VmValue Execute(
+        VmProgram program,
+        string entryFunctionName,
+        IVmExecutionObserver? observer)
+    {
         ArgumentNullException.ThrowIfNull(program);
         ArgumentException.ThrowIfNullOrWhiteSpace(entryFunctionName);
 
@@ -62,18 +81,30 @@ public sealed class VirtualMachine
 
         try
         {
+            if (observer is not null &&
+                observer.TryInvokeFunction(
+                    vm: this,
+                    function: entryFunction,
+                    arguments: [],
+                    result: out VmValue compiledEntryResult))
+            {
+                return compiledEntryResult;
+            }
+
             Dictionary<VmFunction, VmValue[]> constantCache = MaterializeConstants(program);
             PushFrame(
                 function: entryFunction,
                 arguments: [],
                 returnSlot: -1,
-                constants: constantCache[entryFunction]);
+                constants: constantCache[entryFunction],
+                observer: observer);
 
             while (_frames.Count > 0)
             {
                 VmValue? finished = Step(
                     functions: program.Functions,
-                    constantCache: constantCache);
+                    constantCache: constantCache,
+                    observer: observer);
 
                 if (finished is { } result)
                 {
@@ -97,6 +128,7 @@ public sealed class VirtualMachine
             seenHandles: []);
     }
 
+    /// <inheritdoc />
     public string FormatValue(
         VmValue value)
     {
@@ -122,6 +154,7 @@ public sealed class VirtualMachine
         };
     }
 
+    /// <inheritdoc />
     public VmValue GetArrayElement(
         int handle,
         int index)
@@ -136,6 +169,7 @@ public sealed class VirtualMachine
         return arrayObject.Elements[index];
     }
 
+    /// <inheritdoc />
     public int GetArrayLength(
         int handle)
     {
@@ -148,12 +182,14 @@ public sealed class VirtualMachine
         return _gcHeap.GetStats();
     }
 
+    /// <inheritdoc />
     public HeapObjectKind GetHeapObjectKind(
         int handle)
     {
         return _gcHeap.GetHeapObjectKind(handle);
     }
 
+    /// <inheritdoc />
     public string GetString(
         int handle)
     {
@@ -167,6 +203,7 @@ public sealed class VirtualMachine
         return _gcHeap.IsAliveHandle(handle);
     }
 
+    /// <inheritdoc />
     public void SetArrayElement(
         int handle,
         int index,
@@ -180,6 +217,30 @@ public sealed class VirtualMachine
         }
 
         arrayObject.Elements[index] = value;
+    }
+
+    /// <inheritdoc />
+    public void EnterCompiledFrame(
+        VmValue[] locals,
+        VmValue[] constants)
+    {
+        ArgumentNullException.ThrowIfNull(locals);
+        ArgumentNullException.ThrowIfNull(constants);
+
+        _compiledFrameRoots.Add(new CompiledFrameRoots(
+            locals: locals,
+            constants: constants));
+    }
+
+    /// <inheritdoc />
+    public void ExitCompiledFrame()
+    {
+        if (_compiledFrameRoots.Count == 0)
+        {
+            throw new InvalidOperationException("no compiled frame is active");
+        }
+
+        _compiledFrameRoots.RemoveAt(_compiledFrameRoots.Count - 1);
     }
 
     private static VmValue MaterializeConstant(
@@ -227,6 +288,19 @@ public sealed class VirtualMachine
         foreach (VmValue[] constants in _constantRoots)
         {
             foreach (VmValue value in constants)
+            {
+                yield return value;
+            }
+        }
+
+        foreach (CompiledFrameRoots frameRoots in _compiledFrameRoots)
+        {
+            foreach (VmValue value in frameRoots.Locals)
+            {
+                yield return value;
+            }
+
+            foreach (VmValue value in frameRoots.Constants)
             {
                 yield return value;
             }
@@ -363,7 +437,8 @@ public sealed class VirtualMachine
         VmFunction function,
         ReadOnlySpan<VmValue> arguments,
         int returnSlot,
-        VmValue[] constants)
+        VmValue[] constants,
+        IVmExecutionObserver? observer)
     {
         if (arguments.Length != function.ParameterCount)
         {
@@ -390,6 +465,7 @@ public sealed class VirtualMachine
                 constants: constants,
                 baseSlot: baseSlot,
                 returnSlot: returnSlot));
+        observer?.OnFunctionEntered(function);
     }
 
     private VmValue ReadOperand(
@@ -408,12 +484,14 @@ public sealed class VirtualMachine
     {
         _frames.Clear();
         _constantRoots.Clear();
+        _compiledFrameRoots.Clear();
         _stackTop = 0;
     }
 
     private VmValue? Step(
         IReadOnlyDictionary<string, VmFunction> functions,
-        IReadOnlyDictionary<VmFunction, VmValue[]> constantCache)
+        IReadOnlyDictionary<VmFunction, VmValue[]> constantCache,
+        IVmExecutionObserver? observer)
     {
         CallFrame frame = _frames[^1];
 
@@ -499,7 +577,7 @@ public sealed class VirtualMachine
                             operand: call.Arguments[index]);
                     }
 
-                    if (Builtins.Exists(call.Callee))
+                    if (BuiltinCatalog.Exists(call.Callee))
                     {
                         VmValue result = VmBuiltins.Invoke(
                             name: call.Callee,
@@ -521,31 +599,65 @@ public sealed class VirtualMachine
                         throw new InvalidOperationException($"unknown function '{call.Callee}'");
                     }
 
+                    if (observer is not null &&
+                        observer.TryInvokeFunction(
+                            vm: this,
+                            function: targetFunction,
+                            arguments: arguments,
+                            result: out VmValue compiledResult))
+                    {
+                        if (call.DestinationRegister is { } compiledDestination)
+                        {
+                            _stack[frame.BaseSlot + compiledDestination] = compiledResult;
+                        }
+
+                        return null;
+                    }
+
                     PushFrame(
                         function: targetFunction,
                         arguments: arguments,
                         returnSlot: call.DestinationRegister is { } callDst
                             ? frame.BaseSlot + callDst
                             : -1,
-                        constants: constantCache[targetFunction]);
+                        constants: constantCache[targetFunction],
+                        observer: observer);
 
                     return null;
                 }
 
             case VmBranchInstruction branch:
+                if (branch.TargetInstruction <= frame.InstructionPointer - 1)
+                {
+                    observer?.OnLoopBackEdge(
+                        function: frame.Function,
+                        sourceInstruction: frame.InstructionPointer - 1,
+                        targetInstruction: branch.TargetInstruction);
+                }
+
                 frame.InstructionPointer = branch.TargetInstruction;
                 _frames[^1] = frame;
 
                 return null;
 
             case VmBranchConditionInstruction branchCondition:
-                frame.InstructionPointer = VmValueOps.ToBool(
+                int branchTarget = VmValueOps.ToBool(
                     value: ReadOperand(
                         frame: frame,
                         operand: branchCondition.Condition),
                     vm: this)
                     ? branchCondition.TrueTarget
                     : branchCondition.FalseTarget;
+
+                if (branchTarget <= frame.InstructionPointer - 1)
+                {
+                    observer?.OnLoopBackEdge(
+                        function: frame.Function,
+                        sourceInstruction: frame.InstructionPointer - 1,
+                        targetInstruction: branchTarget);
+                }
+
+                frame.InstructionPointer = branchTarget;
 
                 _frames[^1] = frame;
 
@@ -606,5 +718,14 @@ public sealed class VirtualMachine
         public int InstructionPointer { get; set; }
 
         public int ReturnSlot { get; } = returnSlot;
+    }
+
+    private readonly struct CompiledFrameRoots(
+        VmValue[] locals,
+        VmValue[] constants)
+    {
+        public VmValue[] Constants { get; } = constants;
+
+        public VmValue[] Locals { get; } = locals;
     }
 }

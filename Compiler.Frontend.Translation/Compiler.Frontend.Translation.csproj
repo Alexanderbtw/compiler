@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Compiler.Core\Compiler.Core.csproj"/>
     <ProjectReference Include="..\Compiler.Frontend\Compiler.Frontend.csproj"/>
   </ItemGroup>
 

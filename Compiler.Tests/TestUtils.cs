@@ -5,12 +5,12 @@ using Antlr4.Runtime;
 
 using Compiler.Backend.JIT.Abstractions;
 using Compiler.Backend.VM;
+using Compiler.Core.Builtins;
 using Compiler.Frontend;
 using Compiler.Frontend.Translation.HIR;
 using Compiler.Frontend.Translation.HIR.Common;
 using Compiler.Frontend.Translation.HIR.Expressions;
 using Compiler.Frontend.Translation.HIR.Expressions.Abstractions;
-using Compiler.Frontend.Translation.HIR.Metadata;
 using Compiler.Frontend.Translation.HIR.Semantic;
 using Compiler.Frontend.Translation.HIR.Semantic.Exceptions;
 using Compiler.Frontend.Translation.HIR.Statements;
@@ -152,6 +152,18 @@ internal static class TestUtils
             options: new MirOptimizationOptions(enabledPasses));
     }
 
+    public static MirModule BuildMir(
+        string src,
+        MirOptimizationLevel level = MirOptimizationLevel.O1)
+    {
+        ProgramHir hir = BuildHir(src);
+        var pipeline = new FrontendPipeline(NullLogger<FrontendPipeline>.Instance);
+
+        return pipeline.BuildMir(
+            hir: hir,
+            options: new MirOptimizationOptions(level));
+    }
+
     public static IEnumerable<object[]> EnumerateProgramFiles()
     {
         string dir = GetProgramsDir();
@@ -256,6 +268,31 @@ internal static class TestUtils
         MirModule mir = BuildMir(
             src: src,
             enabledPasses: enabledPasses);
+
+        var vm = new VirtualMachine();
+
+        var sb = new StringBuilder();
+        using var writer = new StringWriter(sb);
+        using IDisposable _ = BuiltinsCore.PushWriter(writer);
+
+        IBackendCompiler<VmCompiledProgram> jit = new MirBackendCompiler();
+        VmCompiledProgram program = jit.Compile(mir);
+        VmValue v = program.Execute(
+            vm: vm,
+            entryFunctionName: "main");
+
+        return (vm.ExportValue(v), sb
+            .ToString()
+            .TrimEnd());
+    }
+
+    public static (object? ret, string stdout) RunVmMirJit(
+        string src,
+        MirOptimizationLevel level = MirOptimizationLevel.O1)
+    {
+        MirModule mir = BuildMir(
+            src: src,
+            level: level);
 
         var vm = new VirtualMachine();
 
